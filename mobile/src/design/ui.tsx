@@ -155,12 +155,12 @@ export function SearchBox({ value, onChangeText, onPress, placeholder = "Search 
   const style = [styles.row, { backgroundColor: "white", borderRadius: 12, paddingHorizontal: 16, minHeight: 52, borderWidth: 1, borderColor: focused ? palette.primary : palette.line }];
   return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={placeholder} onPress={onPress} style={style}>{content}</Pressable> : <View style={style}>{content}</View>;
 }
-export function TabsRow({ items, value, onChange, color }: { items: string[]; value: string; onChange: (value: string) => void; color?: string }) {
+export function TabsRow({ items, value, onChange, color, alignEndItem }: { items: string[]; value: string; onChange: (value: string) => void; color?: string; alignEndItem?: string }) {
   const palette = usePalette();
   const accent = color || palette.primary;
   return <View accessibilityRole="tablist" style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>{items.map(item =>
     <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: value === item }} aria-selected={value === item} onPress={() => onChange(item)} style={{ minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
-      backgroundColor: value === item ? palette.soft : "white", borderColor: value === item ? accent : palette.line }}><Txt style={{ fontWeight: "600", color: value === item ? accent : palette.muted }}>{item}</Txt></Pressable>)}
+      marginLeft: item === alignEndItem ? 'auto' : undefined, backgroundColor: value === item ? palette.soft : "white", borderColor: value === item ? accent : palette.line }}><Txt style={{ fontWeight: "600", color: value === item ? accent : palette.muted }}>{item}</Txt></Pressable>)}
   </View>;
 }
 export function Choice({ label, selected, onPress, square = false }: { label: string; selected: boolean; onPress: () => void; square?: boolean }) {
