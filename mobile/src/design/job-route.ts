@@ -1,7 +1,7 @@
 export type RoutePoint = { latitude: number; longitude: number };
 export type JobRouteEndpoints = { orderId: number; workflowVersion: number; stage: 'Pickup' | 'Delivery'; origin: RoutePoint | null; destination: RoutePoint | null; missingPins: ('customer' | 'shop')[] };
 export type RoadRoute = { coordinates: [number, number][]; distanceMeters: number; durationSeconds: number };
-export type JobRouteMapData = { origin: RoutePoint | null; destination: RoutePoint | null; coordinates: [number, number][] };
+export type JobRouteMapData = { stage: 'Pickup' | 'Delivery'; origin: RoutePoint | null; destination: RoutePoint | null; coordinates: [number, number][] };
 
 export function validRoutePoint(value: RoutePoint | null): value is RoutePoint {
   return !!value && Number.isFinite(value.latitude) && Math.abs(value.latitude) <= 90 && Number.isFinite(value.longitude) && Math.abs(value.longitude) <= 180;

@@ -13,6 +13,7 @@ import { WeightEvidenceCard, WeightUpdateForm, type WeightEvidence } from './Wei
 import { CustomerRiderTracking } from './CustomerRiderTracking';
 import { RiderLocationSharingControl } from './RiderLocationSharing';
 import { CallContactButton } from './CallContactButton';
+import { InvoiceButton } from './InvoiceButton';
 import { riderNavigationUrl } from './rider-navigation';
 
 import type { TurnaroundOrder } from './TurnaroundDetails';
@@ -146,6 +147,7 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
         <View style={styles.between}><View style={[styles.row, { flexShrink: 1 }]}><Package size={22} color={palette.primary} /><Txt style={styles.heading}>{order.serviceName}</Txt></View><Badge value={order.workflowStatus} /></View>
         <View style={styles.between}><View><Txt style={{ fontWeight: '600' }}>{order.userName}</Txt><Txt style={{ color: palette.muted, fontSize: 12 }}>{order.kiloAmount} kg · {order.shop.shopName}</Txt></View><Txt style={{ fontSize: 24, fontWeight: '700', color: palette.primary }}>{money(order.totalAmount)}</Txt></View>
       </Card>
+      <InvoiceButton orderId={order.id} />
       <OrderStepIndicator {...progress} selected={viewedStep} onSelect={setSelectedStep} />
       {progress.cancelled && <Txt accessibilityRole="alert" style={{ color: palette.danger, fontWeight: '600' }}>Order cancelled. You can review the recorded steps below.</Txt>}
       {!!command.error && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{command.error}</Txt>}
@@ -308,6 +310,7 @@ export function RiderDashboardDesign({ history = false }: { history?: boolean })
           return <Card key={job.id} style={{ width: width >= 1100 ? '48.8%' : '100%', gap: 16 }}>
             <View style={styles.between}><Txt style={styles.heading}>{job.stage} · Order #{job.transactionId}</Txt><Badge value={job.status === 'Accepted' ? job.order.status : job.status} /></View>
             <Txt style={styles.muted}>{job.order.shop.name} · {job.order.serviceName} · {job.order.kiloAmount} kg</Txt>
+            {['Accepted', 'Completed'].includes(job.status) && <InvoiceButton orderId={job.transactionId} />}
             <Txt style={{ fontSize: 12, color: palette.muted }}>Scheduled {scheduleLabel(job.order)}</Txt>
             {job.status === 'Accepted' && handoff && <HandoffPanel handoff={handoff} rider busy={command.busy} send={action => choose(job, action, action === 'arriveHandoff' ? 'Confirm arrival' : handoff.kind === 'delivery' ? 'Confirm delivery completed' : 'Confirm laundry received')} />}
             {stops.map((stop, index) => <View key={index} style={{ borderLeftWidth: 2, borderLeftColor: palette.line, paddingLeft: 12, gap: 6 }}><Txt style={{ fontSize: 12, color: palette.muted }}>{index === 0 ? 'COLLECT FROM' : 'TAKE TO'}</Txt>{!!stop.name && <Txt style={{ fontWeight: '600' }}>{stop.name}</Txt>}<Txt>{stop.address}</Txt>
