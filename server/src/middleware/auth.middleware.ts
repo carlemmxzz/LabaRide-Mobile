@@ -27,10 +27,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     if (!Number.isSafeInteger(decoded.userId) || decoded.userId <= 0) throw new Error('Invalid identity');
     // Permissions come from the database on every request, never old JWT claims.
     const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: {
-      id: true, isShopOwner: true, isAdmin: true, isRider: true,
+      id: true, isShopOwner: true, isAdmin: true, isRider: true, isBlocked: true,
       riderProfile: { select: { applicationStatus: true } },
     } });
     if (!user) return sendError(res, 'Account no longer exists', 'UNAUTHORIZED', 401);
+    if (user.isBlocked) return sendError(res, 'Your account has been blocked for a policy violation. Contact support to request a review.', 'ACCOUNT_BLOCKED', 403);
     req.user = { userId: user.id, isShopOwner: user.isShopOwner, isAdmin: user.isAdmin, isRider: user.isRider, riderApplicationStatus: user.riderProfile?.applicationStatus };
     return next();
   } catch (error) {
