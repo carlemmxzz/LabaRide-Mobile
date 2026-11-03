@@ -1285,7 +1285,8 @@ async function clickText(text) {
     }
     const navLabels = await evaluate(`Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).map(e=>e.innerText.trim())`);
     assert.ok(navLabels.includes('Dashboard'),'Admin navigation includes Dashboard');
-    assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services','Customers'].includes(label)),'Admin navigation is separate from customer and shop tabs');
+    assert.ok(navLabels.includes('Customers'),'Admin navigation includes customer management');
+    assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services'].includes(label)),'Admin navigation is separate from customer and shop tabs');
     assert.equal(await evaluate(`!!document.querySelector('[aria-label="Back"]')`),false,'Admin dashboard has no back arrow');
     assert.ok(!(await evaluate('document.body.innerText')).includes('Customer View'),'No customer-mode switch');
     for (const path of ['/home','/profile','/shop/home','/register-shop']) {

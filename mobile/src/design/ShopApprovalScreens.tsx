@@ -168,6 +168,7 @@ export function AdminDashboardDesign() {
         <Button title="Open delivery operations" outline style={desktop ? { alignSelf: 'flex-start', marginTop: 8 } : { marginTop: 8 }} onPress={() => router.push('/admin/operations')} />
       </Card>
       </View>
+      <Card style={{ padding: desktop ? 28 : 20, gap: 12 }}><Txt style={styles.heading}>Customer accounts</Txt><Txt style={styles.muted}>Find customers and block or restore account access for policy violations.</Txt><Button title="Manage customers" outline style={desktop ? { alignSelf: 'flex-start' } : undefined} onPress={() => router.push('/admin/customers')} /></Card>
     </View>
   </Screen>;
 }

@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from "expo-router";
 import { View, useWindowDimensions } from "react-native";
-import { LayoutDashboard, Truck, Bell, Store } from "lucide-react-native";
+import { LayoutDashboard, Truck, Bell, Store, Users } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { InterfaceTheme } from "../../src/design/theme";
 import { Brand, Button, Empty, Screen, Txt, usePalette } from "../../src/design/ui";
@@ -46,6 +46,7 @@ export default function AdminTabs() {
   }}>
     <Tabs.Screen name="index" options={{ title: "Dashboard", href: "/admin",
       tabBarIcon: ({ color }) => <LayoutDashboard size={24} color={color} /> }} />
+    <Tabs.Screen name="customers" options={{ title: "Customers", tabBarIcon: ({ color }) => <Users size={24} color={color} /> }} />
     <Tabs.Screen name="applications" options={{ title: "Shop Applications", tabBarLabel: desktop ? "Shop Applications" : "Applications", tabBarAccessibilityLabel: "Shop Applications", tabBarIcon: ({ color }) => <Store size={24} color={color} /> }} />
     <Tabs.Screen name="operations" options={{ title: "Delivery Operations", tabBarLabel: desktop ? "Delivery Operations" : "Operations", tabBarAccessibilityLabel: "Delivery Operations", tabBarIcon: ({ color }) => <Truck size={24} color={color} /> }} />
     <Tabs.Screen name="notifications" options={{ title: "Updates", tabBarIcon: ({ color }) => <Bell size={24} color={color} /> }} />

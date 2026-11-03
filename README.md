@@ -237,6 +237,20 @@ Run server checks with `npm run build` followed by
 
 ## Migration Notes
 
+### Admin customer management
+
+The Customers tab and dashboard shortcut support customer search, pagination,
+Active/Blocked/All filters, and confirmed block/unblock decisions with a required
+reason. Admin, shop-owner, rider and rider-applicant accounts are excluded.
+Each decision is audited; blocking denies login, authenticated API requests and
+socket sessions. Existing orders are retained.
+
+Deploy the updated API together with migration `20261104000000_customer_access`.
+From `server/`, run `npm run prisma:generate`, `npm run prisma:deploy`, and
+`npm run build`, then restart the API. For Render, push to its configured branch
+and deploy that commit; restarting Expo alone does not update the hosted API.
+Run `npm run test:customers` for isolated authorization and blocking checks.
+
 ### Order invoices
 
 Customers and shop owners can open **View invoice** from order details. Riders
