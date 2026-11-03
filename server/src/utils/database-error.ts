@@ -19,7 +19,7 @@ export function describeDatabaseError(error: unknown) {
     if (/password authentication failed|authentication failed|wrong password/i.test(message)) {
       return { ...unavailable, message: 'Database authentication failed. Verify the database password and connection username in DATABASE_URL.' };
     }
-    if (/maxclients|too many (?:clients|connections)|remaining connection slots/i.test(message)) {
+    if (/EMAXCONNSESSION|max\s*clients|too many (?:clients|connections)|remaining connection slots/i.test(message)) {
       return { ...unavailable, message: 'The database connection limit was reached. Check database and pooler connection usage.' };
     }
     if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|can.t reach database server/i.test(message)) {

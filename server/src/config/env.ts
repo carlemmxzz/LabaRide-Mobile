@@ -19,6 +19,13 @@ const databaseUrl = z.string().transform((value) => {
         url.searchParams.set('connect_timeout', '30');
         changed = true;
       }
+      // Prisma's CPU-based default can exhaust a small shared session pool,
+      // particularly while old and new deployment instances overlap.
+      if (url.hostname.endsWith('.pooler.supabase.com') && url.port === '5432'
+        && !url.searchParams.has('connection_limit')) {
+        url.searchParams.set('connection_limit', '3');
+        changed = true;
+      }
       if (changed) return url.toString();
     }
   } catch {
