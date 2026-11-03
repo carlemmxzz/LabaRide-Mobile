@@ -1452,11 +1452,14 @@ async function clickText(text) {
     assert.deepEqual(workflowWrites.map(body=>body.status),['Accepted','Queued','Processing','Ready','Completed']);
     assert.ok(workflowWrites.every(body=>!body.action),'Status updates retain the original endpoint and payload');
     orders[0].status='Processing';
-    for (const width of [320,390,768]) await visit('/shop/transactions/shop-transaction?id=42',width,'Mark laundry ready',`original-order-processing-${width}`);
+    for (const width of [320,390,768,1440]) {
+      await visit('/shop/transactions/shop-transaction?id=42',width,'Mark laundry ready',`original-order-processing-${width}`);
+      assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'),'Payment method is visible without expanding a card');
+    }
     await clickText('Ready time estimate');
     await waitFor(`!!document.querySelector('[aria-label="Ready date"]')`);
-    await clickText('Order information'); await waitFor('document.body.innerText.includes("Customer Details")');
-    await clickText('Payment information'); assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'));
+    await waitFor('document.body.innerText.includes("Customer Details")');
+    assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'));
     user.isShopOwner=false;
     for (const [status, step] of [['Pending',1],['Accepted',2],['Queued',2],['Processing',3],['Ready',4],['Completed',5],['Cancelled',1]]) {
       orders[0].status=status;
@@ -1471,7 +1474,20 @@ async function clickText(text) {
     return;
   }
   if (orderStepsTest) {
-    for (const width of [320,390,768]) await visit('/shop/transactions/shop-transaction?id=42',width,'Start washing',`order-steps-received-${width}`);
+    for (const width of [320,390,768,1440]) {
+      await visit('/shop/transactions/shop-transaction?id=42',width,'Start washing',`order-steps-received-${width}`);
+      assert.ok(await evaluate('document.body.innerText.toLowerCase().includes("pickup & delivery address")'),'Address is visible without expanding a card');
+      const cards = await evaluate(`Array.from(document.querySelector('[data-testid="order-bento-grid"]').children).map(e=>({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y}))`);
+      assert.equal(Math.abs(cards[0].y-cards[1].y)<2,width>=768,'Bento cards stack on phones and share a row on larger screens');
+      await evaluate(`document.querySelectorAll('[data-testid="order-bento-grid"]')[1].scrollIntoView({block:'start'})`);
+      await pause(150);
+      const bentoShot = await command('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(path.join(artifacts,`order-bento-${width}.png`),Buffer.from(bentoShot.data,'base64'));
+    }
+    await clickText('Cancellation & issues');
+    await waitFor(`!!document.querySelector('[aria-label="Reason or issue details"]')`);
+    assert.equal(workflowWrites.length,0,'Opening issue actions never changes the order');
+    await clickText('Cancellation & issues');
     assert.equal(await evaluate('document.querySelectorAll("[data-testid=order-step-indicator] [role=tab]").length'),5);
     assert.equal(await evaluate(`!!document.querySelector('[aria-label="Measured weight (kg)"]')`),false,'Weight form is initially collapsed');
     assert.equal(await evaluate('document.body.innerText.includes("234567")'),false,'Return code is absent during receipt');
@@ -1494,7 +1510,9 @@ async function clickText(text) {
     await clickText('Start folding'); await clickText('Continue'); await waitFor('document.body.innerText.includes("Mark laundry ready")');
     await clickText('Mark laundry ready'); await clickText('Continue'); await waitFor('document.querySelector("[data-testid=order-step-content]").innerText.includes("Step 4 of 5")');
     await clickText('Handoff confirmation'); await waitFor('document.body.innerText.includes("234567")');
-    await clickText('Order history'); assert.ok(await evaluate('document.body.innerText.includes("Laundry Received")'));
+    const expandHistory = await evaluate(`Array.from(document.querySelectorAll('[role="button"]')).find(e=>/^View all [0-9]+ updates$/.test(e.innerText.trim()))?.innerText`);
+    if(expandHistory) await clickText(expandHistory);
+    assert.ok(await evaluate('document.body.innerText.includes("Laundry Received")'));
     user.isShopOwner=false; orders[0].workflowStatus='Delivered';
     await visit('/order/tracking/42',390,'Confirm receipt','order-steps-customer-return');
     await clickText('Confirm receipt'); await clickText('Continue');

@@ -20,6 +20,7 @@ import type { TurnaroundOrder } from './TurnaroundDetails';
 import { ProcessingTimer } from './ProcessingTimer';
 import { OrderStepIndicator } from './OrderStepIndicator';
 import { OrderDisclosure } from './OrderDisclosure';
+import { OrderActivity, OrderBentoCard, OrderBentoGrid, OrderFact } from './OrderBento';
 import { orderDetailProgress, orderDetailSteps } from './order-detail-steps';
 import { deliveryDay } from './delivery-slots';
 import type { AddressData } from './address';
@@ -142,18 +143,17 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
   }
   return <Screen title={`Order #${id}`} brandedHeader={!!user?.isAdmin}>
     <State query={query} />
-    {order && <View style={styles.stack}>
+    {order && <View style={{ gap: 12 }}>
       <Card style={{ padding: 16 }}>
         <View style={styles.between}><View style={[styles.row, { flexShrink: 1 }]}><Package size={22} color={palette.primary} /><Txt style={styles.heading}>{order.serviceName}</Txt></View><Badge value={order.workflowStatus} /></View>
         <View style={styles.between}><View><Txt style={{ fontWeight: '600' }}>{order.userName}</Txt><Txt style={{ color: palette.muted, fontSize: 12 }}>{order.kiloAmount} kg · {order.shop.shopName}</Txt></View><Txt style={{ fontSize: 24, fontWeight: '700', color: palette.primary }}>{money(order.totalAmount)}</Txt></View>
       </Card>
-      <InvoiceButton orderId={order.id} />
       <OrderStepIndicator {...progress} selected={viewedStep} onSelect={setSelectedStep} />
       {progress.cancelled && <Txt accessibilityRole="alert" style={{ color: palette.danger, fontWeight: '600' }}>Order cancelled. You can review the recorded steps below.</Txt>}
       {!!command.error && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{command.error}</Txt>}
-      <Card testID="order-step-content" style={{ padding: 16, gap: 14 }}>
+      <Card testID="order-step-content" style={{ padding: 20, gap: 12, borderRadius: 20 }}>
         <View style={{ gap: 4 }}>
-          <Txt style={{ fontSize: 11, color: palette.muted }}>Step {viewedStep + 1} of 5{currentView && !closed ? ' · Current step' : viewedStep > progress.current ? ' · Not reached' : ''}</Txt>
+          <Txt style={{ fontSize: 11, fontWeight: '600', letterSpacing: 0.6, color: palette.primary }}>Step {viewedStep + 1} of 5{currentView && !closed ? ' · Current step' : viewedStep > progress.current ? ' · Not reached' : ''}</Txt>
           <Txt accessibilityRole="header" style={{ fontSize: 21, fontWeight: '700' }}>{orderDetailSteps[viewedStep].title === 'Received' ? 'Laundry received' : orderDetailSteps[viewedStep].title === 'Return' ? 'Return & handover' : orderDetailSteps[viewedStep].title === 'Complete' ? 'Order complete' : orderDetailSteps[viewedStep].title}</Txt>
           {!currentView && <Txt style={styles.muted}>{orderDetailSteps[viewedStep].description}</Txt>}
         </View>
@@ -200,39 +200,53 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
         </>}
         {!currentView && <Button title={closed ? 'View final recorded step' : 'Back to current step'} compact outline onPress={() => setSelectedStep(null)} />}
       </Card>
-      {partner && ['LaundryReceived', 'Washing', 'Drying', 'Folding'].includes(order.workflowStatus) && <View style={{ gap: 12, display: currentView ? 'flex' : 'none' }}>
-        <OrderDisclosure title="Ready time estimate">
+      {partner && ['LaundryReceived', 'Washing', 'Drying', 'Folding'].includes(order.workflowStatus) && <View style={{ display: currentView ? 'flex' : 'none' }}><OrderBentoGrid>
+        <OrderBentoCard title="Ready time estimate" subtitle={order.estimatedReadyAt ? stepStamp(order.estimatedReadyAt) : 'No ready time shared yet'} kind="history" expandable actionLabel="Edit ready time">
           <PickerField label="Ready date" mode="date" value={estimateDate} onChange={setEstimateDate} />
           <PickerField label="Ready time" mode="time" value={estimateTime} onChange={setEstimateTime} />
           {!!order.estimatedReadyAt && <Field label="Estimate change reason" value={note} onChangeText={setNote} placeholder="Explain the revised ready time" editable={!command.busy} multiline maxLength={1000} />}
           <Button title={order.estimatedReadyAt ? 'Update ready estimate' : 'Send ready estimate'} outline busy={command.busy} onPress={() => action('updateEstimate')} />
-        </OrderDisclosure>
-        <OrderDisclosure title="Update weight & scale photo"><WeightUpdateForm key={id} kilos={order.kiloAmount} busy={command.busy} save={saveWeight} /></OrderDisclosure>
-      </View>}
+        </OrderBentoCard>
+        <OrderBentoCard title="Update weight & scale photo" subtitle={`${order.kiloAmount} kg recorded · Add scale evidence when reweighing`} expandable actionLabel="Update measurement"><WeightUpdateForm key={id} kilos={order.kiloAmount} busy={command.busy} save={saveWeight} /></OrderBentoCard>
+      </OrderBentoGrid></View>}
       {currentView && !partner && !user?.isAdmin && (viewedStep === 1 && order.collectionMethod === 'ShopPickup' || viewedStep === 3 && order.deliveryType === 'Deliver') && !closed && <CustomerRiderTracking orderId={id} orderStatus={order.workflowStatus} />}
       {(viewedStep === 1 || viewedStep === 3) && order.assignments.some(job => job.stage === (viewedStep === 1 ? 'Pickup' : 'Delivery')) && <OrderDisclosure title="Rider assignments">
         {order.assignments.filter(job => job.stage === (viewedStep === 1 ? 'Pickup' : 'Delivery')).map(job => <View key={job.id} style={{ gap: 4 }}><Txt style={{ fontWeight: '600' }}>{job.rider?.name || 'Assigned rider'}</Txt><Txt style={styles.muted}>{job.status} · {stepStamp(job.updatedAt)}</Txt></View>)}
       </OrderDisclosure>}
-      <OrderDisclosure title="Order information">
-        <Section title={partner ? 'Customer & collection' : 'Your pickup & delivery'} />
-        <Txt>{order.userName}</Txt><Txt>{address(order)}</Txt>
-        {order.collectionMethod === 'ShopPickup' && order.collectionAddress && <><Txt style={styles.muted}>Laundry collection address</Txt><Txt>{address(order.collectionAddress)}</Txt></>}
-        {partner && !!order.userPhone && <Txt selectable>{order.userPhone}</Txt>}
-        <Txt style={{ fontWeight: '600' }}>{order.shop.shopName}</Txt>
-        {!!order.notes && <Txt>{order.notes}</Txt>}
-      </OrderDisclosure>
-      {!!order.weightEvidence?.length && <OrderDisclosure title="Measured weight & scale photos"><WeightEvidenceCard orderId={id} evidence={order.weightEvidence} /></OrderDisclosure>}
-      <OrderDisclosure title="Order history">
-        {order.events.length ? [...order.events].reverse().map(event => <View key={event.id} style={{ borderLeftWidth: 2, borderLeftColor: palette.line, paddingLeft: 12, paddingBottom: 12, gap: 4 }}>
-          <Txt style={{ fontWeight: '600' }}>{label(event.toStatus)}</Txt>{!!event.detail && <Txt>{event.detail}</Txt>}<Txt style={{ color: palette.muted, fontSize: 12 }}>{event.actor.name} · {stepStamp(event.createdAt)}</Txt>
-        </View>) : <Txt style={styles.muted}>No updates recorded yet.</Txt>}
-      </OrderDisclosure>
-      {!closed && (partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && <OrderDisclosure title="Cancellation & issues">
+      <OrderBentoGrid>
+      <OrderBentoCard title="Order information" subtitle={partner ? 'Customer & collection' : 'Your pickup & delivery'} kind="location">
+        <OrderFact label="Customer">{order.userName}</OrderFact>
+        <OrderFact label="Pickup & delivery address">{address(order)}</OrderFact>
+        {order.collectionMethod === 'ShopPickup' && order.collectionAddress && <OrderFact label="Laundry collection address">{address(order.collectionAddress)}</OrderFact>}
+        {partner && !!order.userPhone && <OrderFact label="Contact">{order.userPhone}</OrderFact>}
+        <OrderFact label="Laundry shop">{order.shop.shopName}</OrderFact>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <View style={{ backgroundColor: palette.soft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}><Txt style={{ fontSize: 12, color: palette.primary }}>{order.collectionMethod === 'ShopPickup' ? 'Rider pickup' : 'Customer drop-off'}</Txt></View>
+          <View style={{ backgroundColor: palette.soft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}><Txt style={{ fontSize: 12, color: palette.primary }}>{order.deliveryType === 'Deliver' ? 'Return delivery' : 'Shop collection'}</Txt></View>
+        </View>
+        {!!order.notes && <OrderFact label="Order notes">{order.notes}</OrderFact>}
+      </OrderBentoCard>
+      <OrderBentoCard title="Order total" subtitle="Current amount & invoice" kind="payment">
+        <View style={{ padding: 16, borderRadius: 12, backgroundColor: palette.soft, gap: 4 }}>
+          <Txt style={{ fontSize: 28, fontWeight: '700', color: palette.primary }}>{money(order.totalAmount)}</Txt>
+          <Txt style={{ fontSize: 12, color: palette.primary }}>{order.kiloAmount} kg · {order.serviceName}</Txt>
+        </View>
+        <Txt style={{ fontSize: 12, color: palette.muted }}>View the invoice for the price breakdown and payment method.</Txt>
+        <InvoiceButton orderId={order.id} />
+      </OrderBentoCard>
+      {!!order.weightEvidence?.length && <OrderBentoCard title="Measured weight & scale photos" subtitle="Recorded measurements & supporting evidence"><WeightEvidenceCard orderId={id} evidence={order.weightEvidence} /></OrderBentoCard>}
+      <OrderBentoCard title="Order history" subtitle={`${order.events.length} recorded updates · Latest first`} kind="history">
+        {order.events.length ? <OrderActivity count={3} total={order.events.length}>{[...order.events].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(event => <View key={event.id} style={{ borderLeftWidth: 2, borderLeftColor: palette.soft, paddingLeft: 12, gap: 3 }}>
+          <Txt style={{ fontSize: 13, fontWeight: '600' }}>{label(event.toStatus)}</Txt>{!!event.detail && <Txt style={{ fontSize: 13, color: palette.muted }}>{event.detail}</Txt>}<Txt style={{ color: palette.muted, fontSize: 11 }}>{event.actor.name} · {stepStamp(event.createdAt)}</Txt>
+        </View>)}</OrderActivity> : <Txt style={styles.muted}>No updates recorded yet.</Txt>}
+      </OrderBentoCard>
+      {!closed && (partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && <OrderBentoCard title="Cancellation & issues" subtitle="Report a problem or manage this booking" kind="issues" expandable>
         <Field label="Reason or issue details" value={issueNote} onChangeText={value => { setIssueNote(value); command.setError(''); }} placeholder="Explain the cancellation or issue" editable={!command.busy} multiline maxLength={1000} />
         {(partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && <Button title="Cancel booking" outline color={palette.danger} busy={command.busy} onPress={() => action('cancel', issueNote.trim())} />}
         {(partner || user?.isAdmin) && <Button title="Report delivery issue" outline busy={command.busy} onPress={() => action('issue', issueNote.trim())} />}
         {user?.isAdmin && <Button title="Resolve reported issue" outline busy={command.busy} onPress={() => action('resolveIssue', issueNote.trim())} />}
-      </OrderDisclosure>}
+      </OrderBentoCard>}
+      </OrderBentoGrid>
     </View>}
   </Screen>;
 }
