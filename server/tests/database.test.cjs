@@ -88,3 +88,24 @@ test('API database failures return a controlled response without raw Prisma deta
     assert.ok(!logs.join('\n').includes('secret-jwt'));
   } finally { console.error = originalError; }
 });
+
+test('uncoded Prisma startup failures report safe actionable causes', () => {
+  for (const [detail, expected] of [
+    ['FATAL: Tenant or user not found', /tenant or user/],
+    ['FATAL: password authentication failed', /authentication failed/],
+    ['MaxClientsInSessionMode: max clients reached', /connection limit/],
+    ['connect ENETUNREACH', /unreachable/],
+    ['connect ETIMEDOUT', /timed out/],
+    ['unrecognized initialization failure', /could not initialize/],
+  ]) {
+    const failure = describeDatabaseError({
+      name: 'PrismaClientInitializationError',
+      message: detail + ' postgresql://private-user:private-password@private-host/postgres',
+    });
+    assert.equal(failure.status, 503);
+    assert.equal(failure.apiCode, 'DATABASE_UNAVAILABLE');
+    assert.match(failure.message, expected);
+    assert.ok(!JSON.stringify(failure).includes('private-password'));
+    assert.ok(!JSON.stringify(failure).includes('private-host'));
+  }
+});
