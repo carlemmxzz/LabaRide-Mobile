@@ -107,10 +107,11 @@ export function Header({ title, dark = false, back = true, right, branded = fals
     </View>
   </View>;
 }
-export function Screen({ title, children, footer, dark, background, back = true, scroll = true, padded = true, right, brandedHeader = false }: {
+export function Screen({ title, children, footer, dark, background, back = true, scroll = true, padded = true, right, brandedHeader = false, maxWidth = 1200 }: {
   title?: string; children: React.ReactNode; footer?: React.ReactNode; dark?: boolean; background?: string;
   back?: boolean; scroll?: boolean; padded?: boolean; right?: React.ReactNode;
   brandedHeader?: boolean;
+  maxWidth?: number;
 }) {
   const palette = usePalette();
   const { width } = useWindowDimensions();
@@ -118,7 +119,7 @@ export function Screen({ title, children, footer, dark, background, back = true,
   const darkHeader = dark ?? (segments[0] === "shop" && !!title);
   const inTab = segments[0] === "admin" || segments[0] === "rider" || segments[0] === "shop" || (segments[0] === "(user)" && !segments.some(s => ["order", "orders", "shops"].includes(s)));
   useWebAccessibility(palette.primary);
-  const content = { width: "100%" as const, maxWidth: 1200, alignSelf: "center" as const, padding: padded ? width >= 768 ? 32 : 20 : 0, paddingBottom: padded ? 32 : 0, flexGrow: 1 };
+  const content = { width: "100%" as const, maxWidth, alignSelf: "center" as const, padding: padded ? width >= 768 ? 32 : 20 : 0, paddingBottom: padded ? 32 : 0, flexGrow: 1 };
   return <SafeAreaView style={{ flex: 1, backgroundColor: darkHeader ? palette.primary : background || palette.surface }} edges={inTab ? ["top", "left", "right"] : ["top", "left", "right", "bottom"]}>
     <StatusBar style={darkHeader ? "light" : "dark"} />
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: background || palette.surface }} behavior={Platform.OS === "ios" ? "padding" : undefined}>

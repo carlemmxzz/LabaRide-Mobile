@@ -1612,6 +1612,20 @@ async function clickText(text) {
       const shot=await command('Page.captureScreenshot',{format:'png'});
       fs.writeFileSync(path.join(artifacts,`live-operations-compact-${width}.png`),Buffer.from(shot.data,'base64'));
     }
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/transactions/shop-live-operations',width,'Workflow moves left to right',`live-operations-desktop-${width}`);
+      const stages = await evaluate(`Array.from(document.querySelectorAll('[data-testid^="live-stage-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.equal(stages.length,5);
+      assert.ok(stages.every(stage=>Math.abs(stage.y-stages[0].y)<2),'Desktop stages align horizontally');
+      assert.ok(stages.every((stage,index)=>!index||stage.x>stages[index-1].x),'Desktop workflow advances left to right');
+      const cards = await evaluate(`Array.from(document.querySelectorAll('[data-testid="live-stage-awaiting"] [data-testid^="live-order-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.ok(cards.length>1);
+      assert.ok(cards.every(card=>Math.abs(card.x-cards[0].x)<2),'Cards share the column width');
+      assert.ok(cards.every((card,index)=>!index||card.y>cards[index-1].y),'Cards stack vertically within a stage');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Desktop board scroll stays inside its container');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
+    }
     // Refreshed server state moves the same card and removes completed work.
     orders[0].status = 'Queued';
     orders.find(order => order.id===55).workflowStatus = 'Completed';
