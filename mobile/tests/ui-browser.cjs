@@ -726,7 +726,7 @@ async function clickText(text) {
     for (const width of [320,390,1440]) await visit('/register-shop',width,'Documents uploaded. Waiting for admin verification.',`shop-documents-owner-${width}`);
     user.isAdmin = true;
     for (const width of [320,390,1440]) {
-      await visit('/admin',width,'Approve Shop'); await clickText('Approve Shop');
+      await visit('/admin/applications',width,'Approve Shop'); await clickText('Approve Shop');
       await waitFor('document.body.innerText.includes("Shop verification documents")');
       assert.equal(await evaluate('Array.from(document.querySelector("[aria-modal=true]").querySelectorAll("[role=button]")).find(e=>e.innerText.trim()==="Approve Shop").getAttribute("aria-disabled")'),'true');
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
@@ -742,7 +742,7 @@ async function clickText(text) {
     user.isAdmin = false;
     await visit('/register-shop',390,'Needs correction'); await uploadShopDocument('TinProof');
     user.isAdmin = true;
-    await visit('/admin',390,'Approve Shop'); await clickText('Approve Shop');
+    await visit('/admin/applications',390,'Approve Shop'); await clickText('Approve Shop');
     for (const type of ['SECRegistration','TinProof','MayorsPermit']) {
       await rowClick(type,'View private document');
       await waitFor(`!!document.querySelector('[data-testid="shop-document-${type}"] img')`);
@@ -1099,7 +1099,7 @@ async function clickText(text) {
     await waitFor('location.pathname==="/login"');await waitFor(closed);
     assert.equal(await evaluate('sessionStorage.getItem("auth_token")'),null);assert.equal(await evaluate('sessionStorage.getItem("auth_user")'),null);
     await visit('/shop/profile',390,'Account Information');await openLogout();assert.equal(await evaluate('location.pathname'),'/shop/profile');await clickText('Cancel');await waitFor(closed);assert.equal(await evaluate('location.pathname'),'/shop/profile');
-    user.isAdmin=true;await visit('/admin',1440,'Shop management');await clickText('Approved');await openLogout('Sign Out');await clickText('Cancel');await waitFor(closed);
+    user.isAdmin=true;await visit('/admin/applications',1440,'Shop application requests');await clickText('Approved');await openLogout('Sign Out');await clickText('Cancel');await waitFor(closed);
     const selectedTabs=await evaluate('Array.from(document.querySelectorAll("[role=tab]")).map(e=>({text:e.innerText.trim(),selected:e.getAttribute("aria-selected")}))');
     assert.ok(selectedTabs.some(tab=>tab.text==='Approved'&&tab.selected==='true'),'Admin filters remain selected after cancelling: '+JSON.stringify(selectedTabs));
     await openLogout('Sign Out');await clickText('Log Out');await waitFor('location.pathname==="/login"');await waitFor(closed);
@@ -1247,7 +1247,13 @@ async function clickText(text) {
     await evaluate(`(()=>{for(const [label,value] of [['Email','admin-test@example.test'],['Password','test-password-only']]){const e=document.querySelector('input[aria-label="'+label+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,value);e.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
     await clickText('Log In'); await waitFor('document.body.innerText.includes("Shop management")');
     assert.equal(await evaluate('location.pathname'),'/admin','Admin login opens the dashboard');
-    for (const width of [390,1440]) await visit('/admin',width,'Shop management',`admin-approvals-${width}`);
+    for (const width of [390,1440]) {
+      await visit('/admin',width,'Shop management');
+      assert.equal(await evaluate('!!document.querySelector("input")'),false,'Dashboard has no application search');
+      await clickText('View shop applications');
+      await waitFor('location.pathname==="/admin/applications"');
+      await visit('/admin/applications',width,'Shop application requests',`admin-approvals-${width}`);
+    }
     const navLabels = await evaluate(`Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).map(e=>e.innerText.trim())`);
     assert.ok(navLabels.includes('Dashboard'),'Admin navigation includes Dashboard');
     assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services','Customers'].includes(label)),'Admin navigation is separate from customer and shop tabs');
@@ -1273,13 +1279,13 @@ async function clickText(text) {
     await visit('/shop/home',390,'Pending Approval','application-pending');
     assert.ok((await evaluate('location.pathname')).includes('register-shop'),'Unapproved owner direct URL is guarded');
     user.isAdmin=true;
-    await visit('/admin',390,'Approve Shop'); await clickText('Approve Shop'); await clickText('Cancel');
+    await visit('/admin/applications',390,'Approve Shop'); await clickText('Approve Shop'); await clickText('Cancel');
     assert.equal(reviews.length,1,'Cancelled approval does not submit');
     await clickText('Approve Shop'); await clickText('Approve Shop'); await waitFor('document.body.innerText.includes("No matching applications")');
     user.isAdmin=false;
     await visit('/shop/home',390,'Recent orders');
     user.isAdmin=true;
-    await visit('/admin',390,'Shop management'); await clickText('Approved'); await clickText('Suspend Shop');
+    await visit('/admin/applications',390,'Shop application requests'); await clickText('Approved'); await clickText('Suspend Shop');
     await evaluate(`(()=>{const e=document.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Verification requires review.');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await clickText('Suspend Shop'); await waitFor('!document.body.innerText.includes("Test Laundry & Fabric Care")');
     user.isAdmin=false;

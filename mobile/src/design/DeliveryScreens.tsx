@@ -13,6 +13,7 @@ import { WeightEvidenceCard, WeightUpdateForm, type WeightEvidence } from './Wei
 import { CustomerRiderTracking } from './CustomerRiderTracking';
 import { RiderLocationSharingControl } from './RiderLocationSharing';
 import { CallContactButton } from './CallContactButton';
+import { riderNavigationUrl } from './rider-navigation';
 
 import type { TurnaroundOrder } from './TurnaroundDetails';
 import { ProcessingTimer } from './ProcessingTimer';
@@ -274,6 +275,16 @@ export function RiderDashboardDesign({ history = false }: { history?: boolean })
       await command.send('/delivery/availability', { online: query.data?.rider.online || false, latitude: coords.latitude, longitude: coords.longitude });
     } catch { command.setError('Could not retrieve your position. Try again.'); }
   }
+  async function navigate(stop: Job['order']['customer']) {
+    command.setError('');
+    let url: string;
+    try { url = riderNavigationUrl(stop); }
+    catch (error) { command.setError(message(error)); return; }
+    try {
+      if (Platform.OS === 'web') window.location.assign(url);
+      else await Linking.openURL(url);
+    } catch { command.setError('Could not open Google Maps. Check that a browser or maps app is available, then try again.'); }
+  }
   return <Screen title={history ? 'Job history' : 'Rider dashboard'} back={false} right={<Button title="Sign Out" compact outline onPress={logout} />}>
     <View style={styles.stack}>
       <View><Txt style={styles.title}>{history ? 'Your delivery record' : `Hello, ${user?.name.split(' ')[0] || 'rider'}`}</Txt><Txt style={styles.muted}>{history ? 'Completed trips and assignment outcomes.' : 'Keep laundry moving, one handoff at a time.'}</Txt></View>
@@ -300,7 +311,7 @@ export function RiderDashboardDesign({ history = false }: { history?: boolean })
             <Txt style={{ fontSize: 12, color: palette.muted }}>Scheduled {scheduleLabel(job.order)}</Txt>
             {job.status === 'Accepted' && handoff && <HandoffPanel handoff={handoff} rider busy={command.busy} send={action => choose(job, action, action === 'arriveHandoff' ? 'Confirm arrival' : handoff.kind === 'delivery' ? 'Confirm delivery completed' : 'Confirm laundry received')} />}
             {stops.map((stop, index) => <View key={index} style={{ borderLeftWidth: 2, borderLeftColor: palette.line, paddingLeft: 12, gap: 6 }}><Txt style={{ fontSize: 12, color: palette.muted }}>{index === 0 ? 'COLLECT FROM' : 'TAKE TO'}</Txt>{!!stop.name && <Txt style={{ fontWeight: '600' }}>{stop.name}</Txt>}<Txt>{stop.address}</Txt>
-              {job.status === 'Accepted' && <View style={[styles.row, { flexWrap: 'wrap' }]}><Button title="Navigate" compact outline icon={<Navigation size={15} color={palette.primary} />} onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(stop.latitude != null && stop.longitude != null ? `${stop.latitude},${stop.longitude}` : stop.address)}`)} />{!!stop.phone && <CallContactButton name={stop.name} phone={stop.phone} />}</View>}
+              {job.status === 'Accepted' && <View style={[styles.row, { flexWrap: 'wrap' }]}><Button title="Navigate" compact outline icon={<Navigation size={15} color={palette.primary} />} onPress={() => { void navigate(stop); }} />{!!stop.phone && <CallContactButton name={stop.name} phone={stop.phone} />}</View>}
             </View>)}
             {job.status === 'Offered' && <><Txt style={{ color: palette.muted, fontSize: 12 }}>Offer expires {stamp(job.expiresAt)}. Contact details unlock after acceptance.</Txt><View style={[styles.row, { flexWrap: 'wrap' }]}><Button title="Accept job" onPress={() => choose(job, 'accept', 'Accept assignment', false, true)} /><Button title="Decline" outline color={palette.danger} onPress={() => choose(job, 'decline', 'Decline assignment', false, true)} /></View></>}
             {job.status === 'Accepted' && <>{!!job.order.customer.instructions && <Txt>Instructions: {job.order.customer.instructions}</Txt>}{!!job.order.customer.notes && <Txt>Order notes: {job.order.customer.notes}</Txt>}{!!job.order.customer.accessCode && <Txt>Access: {job.order.customer.accessCode}</Txt>}{job.stage === 'Delivery' && <Txt>Order total: {money(job.order.totalAmount)} · {job.order.paymentMethod}</Txt>}{next && <Button title={handoff ? 'Use code instead (fallback)' : next.title} outline={!!handoff} onPress={() => choose(job, next.action, next.title, next.code)} />}{job.stage === 'Pickup' && ['PickupAccepted', 'PickupEnRoute'].includes(job.order.status) && <Button title="Pickup unsuccessful" outline color={palette.danger} onPress={() => choose(job, 'failedPickup', 'Report failed pickup')} />}<Button title="Report an issue" outline color={palette.danger} onPress={() => choose(job, 'issue', 'Report delivery issue')} /></>}
