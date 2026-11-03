@@ -86,7 +86,7 @@ export function ShopCard({ shop, horizontal = false, onPress, distance }: {
     onPress={onPress || (() => router.push({ pathname: "/(user)/shops/[id]", params: { id: String(shop.id) } }))}
     style={({ pressed }) => ({ width: horizontal ? Math.min(296, width - 72) : undefined, opacity: pressed ? 0.86 : 1 })}>
     <Card style={{ padding: 10, gap: 0, borderRadius: 24 }}>
-      <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} />
+      <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} style={{ width: "100%", height: 180, aspectRatio: undefined }} />
       <View style={{ padding: 8, paddingTop: 16, gap: 10 }}>
         <Txt numberOfLines={2} style={{ fontSize: 18, fontWeight: "700" }}>{shop.shopName}</Txt>
         <Txt style={{ fontSize: 12, fontWeight: "600", color: availability.isOpen ? palette.primary : palette.muted }}>{availability.label}</Txt>
@@ -211,6 +211,8 @@ export function ShopsDesign({
   const palette = usePalette();
   const { width } = useWindowDimensions();
   const webMap = map && Platform.OS === "web";
+  const [resultsWidth, setResultsWidth] = useState(0);
+  const resultColumns = resultsWidth >= 960 ? 3 : resultsWidth >= 600 ? 2 : 1;
   const { go: openFlow, inShop } = useFlowNavigation();
   const shops = useShops();
   const [query, setQuery] = useState("");
@@ -311,9 +313,16 @@ export function ShopsDesign({
             ))}
           </ScrollView>
         ) : (
-          filtered.map((shop) => (
-            <ShopCard key={shop.id} shop={shop} onPress={() => open(shop)} />
-          ))
+          <View
+            onLayout={({ nativeEvent }) => setResultsWidth(nativeEvent.layout.width)}
+            style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 16 }}
+          >
+            {filtered.map((shop) => (
+              <View key={shop.id} style={{ width: resultsWidth ? (resultsWidth - 16 * (resultColumns - 1)) / resultColumns : "100%", minWidth: 0 }}>
+                <ShopCard shop={shop} onPress={() => open(shop)} />
+              </View>
+            ))}
+          </View>
         )}
         {!shops.isLoading && !shops.error && !filtered.length && (
           <Empty

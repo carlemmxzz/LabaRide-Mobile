@@ -9,6 +9,7 @@ import { originalOrderDetailProgress, orderDetailSteps } from "./order-detail-st
 import { ProcessingTimer, type ProcessingTimerActions } from "./ProcessingTimer";
 import { orderUpdateText } from "./TurnaroundDetails";
 import { DeliveryDetails } from "./AddressFields";
+import { InvoiceButton } from './InvoiceButton';
 
 const timestamp = (value: string) => new Date(value).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " (PHT)";
 
@@ -45,6 +46,7 @@ export function OriginalOrderDetails({ order, partner = false, primaryAction, bo
           <Txt style={{ fontSize: 24, fontWeight: "700", color: palette.primary }}>{money(order.totalAmount)}</Txt>
         </View>
       </Card>
+      <InvoiceButton orderId={order.id} />
       <OrderStepIndicator {...progress} selected={viewedStep} onSelect={setSelectedStep} />
       {progress.cancelled && <Txt accessibilityRole="alert" style={{ color: palette.danger, fontWeight: "600" }}>Order cancelled. You can review the recorded steps below.</Txt>}
       <Card testID="order-step-content" style={{ padding: 16, gap: 14 }}>

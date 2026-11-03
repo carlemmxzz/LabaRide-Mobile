@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View, useWindowDimensions } from "react-native";
-import { ArrowRight, Check, CheckCircle2, Clock3, LockKeyhole, MapPin, Phone, RefreshCw, ShoppingBag, Store, TriangleAlert, type LucideIcon } from "lucide-react-native";
+import { ArrowRight, Check, CheckCircle2, Clock3, LockKeyhole, MapPin, Phone, RefreshCw, ShoppingBag, Store, TriangleAlert, Truck, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useAuthStore } from "../store/authStore";
 import { address, api, message, useProfile, type Shop } from "./data";
 import { Button, Card, Empty, Field, Screen, SearchBox, TabsRow, Txt, styles, usePalette } from "./ui";
@@ -129,6 +130,49 @@ interface Application extends Shop {
 }
 
 export function AdminDashboardDesign() {
+  const palette = usePalette();
+  const [contentWidth, setContentWidth] = useState(0);
+  const desktop = contentWidth >= 760;
+  const logout = useLogout();
+  const auth = useAuthStore();
+  const profile = useProfile();
+  const applications = useQuery({
+    queryKey: ["admin-shops", auth.user?.id], enabled: !!profile.data?.isAdmin,
+    queryFn: () => api.get<Application[]>("/admin/shops"), refetchInterval: 15000,
+  });
+  return <Screen title="Admin Dashboard" brandedHeader back={false} background={palette.surface}>
+    <View onLayout={({ nativeEvent }) => setContentWidth(nativeEvent.layout.width)} style={[styles.stack, { width: '100%', maxWidth: 1200, alignSelf: 'center', gap: desktop ? 28 : 20 }]}>
+      <View style={[styles.between, { alignItems: 'flex-start', gap: 16 }]}>
+        <View style={{ flex: 1, gap: 4 }}><Txt style={styles.title}>Shop management</Txt><Txt style={styles.muted}>Monitor shop requests and delivery operations.</Txt></View>
+        <Button title="Sign Out" outline onPress={logout} />
+      </View>
+      <QueryState loading={applications.isLoading} error={applications.error} retry={() => applications.refetch()} />
+      <View style={{ flexDirection: desktop ? 'row' : 'column', gap: 24, alignItems: 'stretch' }}>
+      <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0, padding: desktop ? 28 : 20, gap: 16 }}>
+        <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: palette.soft, alignItems: 'center', justifyContent: 'center' }}><Store size={24} color={palette.primary} /></View>
+        <Txt style={styles.heading}>Shop application requests</Txt>
+        <View style={{ flex: 1, gap: 8 }}>
+          <Txt style={{ fontSize: 36, lineHeight: 44, fontWeight: '700', color: palette.primary }}>{applications.data ? applications.data.filter(shop => shop.approvalStatus === 'Pending').length : '—'}</Txt>
+          <Txt style={styles.muted}>Applications pending review</Txt>
+          <Txt style={styles.muted}>Review shop details, verify documents, and manage shop access.</Txt>
+        </View>
+        <Button title="View shop applications" style={desktop ? { alignSelf: 'flex-start', marginTop: 8 } : { marginTop: 8 }} onPress={() => router.push('/admin/applications')} />
+      </Card>
+      <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0, padding: desktop ? 28 : 20, gap: 16 }}>
+        <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: palette.soft, alignItems: 'center', justifyContent: 'center' }}><Truck size={24} color={palette.primary} /></View>
+        <Txt style={styles.heading}>Delivery operations</Txt>
+        <View style={{ flex: 1, gap: 12 }}>
+          <Txt style={[styles.muted, { lineHeight: 22 }]}>Manage riders, assignments, and active deliveries.</Txt>
+          <Txt style={[styles.muted, { lineHeight: 22 }]}>Review rider requests and monitor laundry pickups and drop-offs from one place.</Txt>
+        </View>
+        <Button title="Open delivery operations" outline style={desktop ? { alignSelf: 'flex-start', marginTop: 8 } : { marginTop: 8 }} onPress={() => router.push('/admin/operations')} />
+      </Card>
+      </View>
+    </View>
+  </Screen>;
+}
+
+export function AdminShopApplicationsDesign() {
   const logout = useLogout();
   const palette = usePalette();
   const { width } = useWindowDimensions();
@@ -173,10 +217,10 @@ export function AdminDashboardDesign() {
   const list = applications.data || [];
   const visible = list.filter(shop => (filter === "All" || shop.approvalStatus === filter)
     && `${shop.shopName} ${shop.user.name} ${shop.user.email} ${address(shop)}`.toLowerCase().includes(search.toLowerCase()));
-  return <Screen title="Admin Dashboard" brandedHeader back={false} background={palette.surface}>
+  return <Screen title="Shop Applications" brandedHeader back={false} background={palette.surface}>
     <View style={styles.stack}>
       <View style={styles.between}>
-        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Shop management</Txt><Txt style={styles.muted}>Review applications and manage shop access.</Txt></View>
+        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Shop application requests</Txt><Txt style={styles.muted}>Review applications and manage shop access.</Txt></View>
         <View style={[styles.row, { flexWrap: "wrap" }]}>
           <Button title="Sign Out" outline onPress={logout} />
         </View>
@@ -187,7 +231,7 @@ export function AdminDashboardDesign() {
         </Card>)}
       </View>
       <SearchBox placeholder="Search shops, owners, or addresses" value={search} onChangeText={setSearch} />
-      <TabsRow items={[...statuses, "All"]} value={filter} onChange={setFilter} />
+      <TabsRow items={[...statuses, "All"]} value={filter} onChange={setFilter} alignEndItem="All" />
       <View style={[styles.between, { gap: 8 }]}>
         <Txt accessibilityLiveRegion="polite" style={styles.muted}>{visible.length} {visible.length === 1 ? "shop" : "shops"}{filter !== "All" ? ` · ${labels[filter as Status]}` : " · All statuses"}</Txt>
         <Button title="Refresh" compact outline busy={applications.isFetching} icon={<RefreshCw size={15} color={palette.primary} />} onPress={() => { void applications.refetch(); void profile.refetch(); }} />

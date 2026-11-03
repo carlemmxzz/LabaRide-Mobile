@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const artifacts = path.join(root, 'artifacts/ui-redesign');
 const photoTest = process.argv.includes('--photos');
 const approvalTest = process.argv.includes('--approvals');
+const invoiceTest = process.argv.includes('--invoices');
 const weightTest = process.argv.includes('--weight-evidence');
 const responseTest = process.argv.includes('--assignment-response');
 const pullTest = process.argv.includes('--pull-jobs');
@@ -220,6 +221,12 @@ async function clickText(text) {
         }
         if (!request.url.includes('/api/')) { await command('Fetch.continueRequest',{ requestId }); return; }
         const endpoint = new URL(request.url).pathname;
+        if (invoiceTest && /^\/api\/transactions\/\d+\/invoice$/.test(endpoint)) {
+          const orderId = Number(endpoint.split('/')[3]);
+          const data = { number: `LR-${String(orderId).padStart(6,'0')}`, orderId, createdAt: '2026-11-04T00:00:00Z', updatedAt: '2026-11-04T01:00:00Z', status: 'LaundryReceived', currency: 'PHP', customer: { name: 'Test Invoice Customer' }, shop: { name: 'Test Laundry & Fabric Care', address: '123 Main Street, Naga', phone: '09123456789' }, serviceName: 'Full Service', kilos: '8.25', items: [{ itemName: 'Shirt', quantity: 3 }], subtotal: '215.10', deliveryFee: '30.00', discount: '10.00', total: '235.10', paymentMethod: 'Cash on Delivery' };
+          await command('Fetch.fulfillRequest', { requestId, responseCode: mode==='error' && request.method!=='OPTIONS'?503:200, responseHeaders: [{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'},{name:'Access-Control-Allow-Methods',value:'GET, OPTIONS'}], body: Buffer.from(JSON.stringify(mode==='error'?{success:false,error:{message:'Invoice temporarily unavailable'}}:{success:true,data})).toString('base64') });
+          return;
+        }
         const photoEndpoint = endpoint === '/api/shops/101/photo';
         if(pullTest && request.method==='GET' && /^\/api\/delivery\/orders\/(42|43)\/route-preview$/.test(endpoint)) {
           const pickup=endpoint.includes('/42/');
@@ -460,7 +467,7 @@ async function clickText(text) {
           : dispatchTest && endpoint === '/api/delivery/operations' ? { orders: dispatchOrders, riders: [] }
           : riderApplicationTest && (endpoint === '/api/delivery/application' || endpoint === '/api/delivery/applications/12') ? requirementFixture
           : deliveryTest && endpoint === '/api/delivery/orders/42' ? { ...orders[0], weightEvidence: weightRecords, handoff: handoffFixture, workflowStatus: trackingTest ? trackingPhase : bookingTest ? bookingState : handoffFixture ? deliveryJobs[0].order.status : 'Folding', workflowVersion: bookingTest ? bookingVersion : handoffFixture ? deliveryJobs[0].order.version : 8 + weightWrites.length, pickupCode: user.isShopOwner ? undefined : '123456', deliveryCode: user.isShopOwner ? undefined : '345678', collectionCode: user.isShopOwner ? '234567' : undefined, assignments: [{ ...deliveryJobs[0], rider: { name: 'Assigned Rider' } }], events: [{ id: 1, action: 'fold', toStatus: 'Folding', createdAt: new Date().toISOString(), actor: { name: 'Laundry Partner' }, detail: 'Laundry is being folded.' }] }
-          : (deliveryTest || riderApplicationTest || notificationsTest) && endpoint === '/api/delivery/rider' ? { rider: { online: true }, jobs: deliveryJobs }
+          : (deliveryTest || riderApplicationTest || notificationsTest || invoiceTest) && endpoint === '/api/delivery/rider' ? { rider: { online: true }, jobs: deliveryJobs }
           : riderApplicationTest && endpoint === '/api/delivery/operations' ? { orders: [], riders: [
             { userId: 12, applicationStatus: 'Pending', active: false, online: false, workload: 0, user: { name: 'Applicant Rider', email: 'rider@example.test', phone: '09123456789' } },
             { userId: 13, applicationStatus: 'Draft', active: false, online: false, canEnable: false, workload: 0, user: { name: 'Draft Rider', email: 'draft@example.test' } },
@@ -487,6 +494,28 @@ async function clickText(text) {
   });
   await command('Page.enable'); await command('Runtime.enable');
   await command('Fetch.enable',{ patterns:[{urlPattern:'*/api/*'}, ...(trackingTest || pullTest ? [{urlPattern:'*unpkg.com/leaflet*'}] : []), ...(pullTest?[{urlPattern:'https://api.mapbox.com/directions/*'}]:[])] });
+  if (invoiceTest) {
+    await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.invoiceExports=[];window.open=()=>({opener:null,document:{write:html=>window.invoiceExports.push(html),close:()=>{}}});` });
+    async function checkInvoice(route, width, number, screenshot) {
+      await visit(route,width,'View invoice'); await clickText('View invoice');
+      await waitFor(`document.body.innerText.includes(${JSON.stringify(number)})`);
+      assert.ok(await evaluate('document.body.innerText.includes("PHP 235.10")'));
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Invoice fits viewport');
+      await clickText('Print / Save PDF');
+      assert.ok(await evaluate('window.invoiceExports[0].includes("PHP 235.10")'));
+      if(screenshot) { const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,screenshot+'.png'),Buffer.from(shot.data,'base64')); }
+      await clickText('Close invoice');
+      await waitFor('!document.querySelector("[data-testid=order-invoice]")');
+    }
+    user.isShopOwner=false;
+    for(const width of [320,390,768,1440]) await checkInvoice('/transaction-details?id=42',width,'LR-000042',`invoice-customer-${width}`);
+    user.isShopOwner=true; await checkInvoice('/shop/transactions/shop-transaction?id=42',1440,'LR-000042','invoice-shop-desktop');
+    user.isShopOwner=false;user.isRider=true;
+    await checkInvoice('/rider/jobs',390,'LR-000043','invoice-rider-phone');
+    await visit('/rider/jobs',390,'View invoice'); mode='error'; await clickText('View invoice'); await waitFor('document.body.innerText.includes("Invoice temporarily unavailable")');
+    mode='populated'; await clickText('Retry'); await waitFor('document.body.innerText.includes("LR-000043")');
+    assert.deepEqual(errors,[]);console.log('PASS invoices for customer, shop and rider; four sizes, print output, close and retry');return;
+  }
   if (callTest) await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.copiedPhoneNumbers=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async number=>{window.copiedPhoneNumbers.push(number)}}});` });
   if (scheduleTest) {
     for (const width of [320,390,768,1440]) {
@@ -726,7 +755,7 @@ async function clickText(text) {
     for (const width of [320,390,1440]) await visit('/register-shop',width,'Documents uploaded. Waiting for admin verification.',`shop-documents-owner-${width}`);
     user.isAdmin = true;
     for (const width of [320,390,1440]) {
-      await visit('/admin',width,'Approve Shop'); await clickText('Approve Shop');
+      await visit('/admin/applications',width,'Approve Shop'); await clickText('Approve Shop');
       await waitFor('document.body.innerText.includes("Shop verification documents")');
       assert.equal(await evaluate('Array.from(document.querySelector("[aria-modal=true]").querySelectorAll("[role=button]")).find(e=>e.innerText.trim()==="Approve Shop").getAttribute("aria-disabled")'),'true');
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
@@ -742,7 +771,7 @@ async function clickText(text) {
     user.isAdmin = false;
     await visit('/register-shop',390,'Needs correction'); await uploadShopDocument('TinProof');
     user.isAdmin = true;
-    await visit('/admin',390,'Approve Shop'); await clickText('Approve Shop');
+    await visit('/admin/applications',390,'Approve Shop'); await clickText('Approve Shop');
     for (const type of ['SECRegistration','TinProof','MayorsPermit']) {
       await rowClick(type,'View private document');
       await waitFor(`!!document.querySelector('[data-testid="shop-document-${type}"] img')`);
@@ -1099,7 +1128,7 @@ async function clickText(text) {
     await waitFor('location.pathname==="/login"');await waitFor(closed);
     assert.equal(await evaluate('sessionStorage.getItem("auth_token")'),null);assert.equal(await evaluate('sessionStorage.getItem("auth_user")'),null);
     await visit('/shop/profile',390,'Account Information');await openLogout();assert.equal(await evaluate('location.pathname'),'/shop/profile');await clickText('Cancel');await waitFor(closed);assert.equal(await evaluate('location.pathname'),'/shop/profile');
-    user.isAdmin=true;await visit('/admin',1440,'Shop management');await clickText('Approved');await openLogout('Sign Out');await clickText('Cancel');await waitFor(closed);
+    user.isAdmin=true;await visit('/admin/applications',1440,'Shop application requests');await clickText('Approved');await openLogout('Sign Out');await clickText('Cancel');await waitFor(closed);
     const selectedTabs=await evaluate('Array.from(document.querySelectorAll("[role=tab]")).map(e=>({text:e.innerText.trim(),selected:e.getAttribute("aria-selected")}))');
     assert.ok(selectedTabs.some(tab=>tab.text==='Approved'&&tab.selected==='true'),'Admin filters remain selected after cancelling: '+JSON.stringify(selectedTabs));
     await openLogout('Sign Out');await clickText('Log Out');await waitFor('location.pathname==="/login"');await waitFor(closed);
@@ -1247,7 +1276,13 @@ async function clickText(text) {
     await evaluate(`(()=>{for(const [label,value] of [['Email','admin-test@example.test'],['Password','test-password-only']]){const e=document.querySelector('input[aria-label="'+label+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,value);e.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
     await clickText('Log In'); await waitFor('document.body.innerText.includes("Shop management")');
     assert.equal(await evaluate('location.pathname'),'/admin','Admin login opens the dashboard');
-    for (const width of [390,1440]) await visit('/admin',width,'Shop management',`admin-approvals-${width}`);
+    for (const width of [390,1440]) {
+      await visit('/admin',width,'Shop management');
+      assert.equal(await evaluate('!!document.querySelector("input")'),false,'Dashboard has no application search');
+      await clickText('View shop applications');
+      await waitFor('location.pathname==="/admin/applications"');
+      await visit('/admin/applications',width,'Shop application requests',`admin-approvals-${width}`);
+    }
     const navLabels = await evaluate(`Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).map(e=>e.innerText.trim())`);
     assert.ok(navLabels.includes('Dashboard'),'Admin navigation includes Dashboard');
     assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services','Customers'].includes(label)),'Admin navigation is separate from customer and shop tabs');
@@ -1273,13 +1308,13 @@ async function clickText(text) {
     await visit('/shop/home',390,'Pending Approval','application-pending');
     assert.ok((await evaluate('location.pathname')).includes('register-shop'),'Unapproved owner direct URL is guarded');
     user.isAdmin=true;
-    await visit('/admin',390,'Approve Shop'); await clickText('Approve Shop'); await clickText('Cancel');
+    await visit('/admin/applications',390,'Approve Shop'); await clickText('Approve Shop'); await clickText('Cancel');
     assert.equal(reviews.length,1,'Cancelled approval does not submit');
     await clickText('Approve Shop'); await clickText('Approve Shop'); await waitFor('document.body.innerText.includes("No matching applications")');
     user.isAdmin=false;
     await visit('/shop/home',390,'Recent orders');
     user.isAdmin=true;
-    await visit('/admin',390,'Shop management'); await clickText('Approved'); await clickText('Suspend Shop');
+    await visit('/admin/applications',390,'Shop application requests'); await clickText('Approved'); await clickText('Suspend Shop');
     await evaluate(`(()=>{const e=document.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Verification requires review.');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await clickText('Suspend Shop'); await waitFor('!document.body.innerText.includes("Test Laundry & Fabric Care")');
     user.isAdmin=false;
