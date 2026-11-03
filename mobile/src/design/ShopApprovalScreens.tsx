@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View, useWindowDimensions } from "react-native";
 import { ArrowRight, Check, CheckCircle2, Clock3, LockKeyhole, MapPin, Phone, RefreshCw, ShoppingBag, Store, TriangleAlert, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useAuthStore } from "../store/authStore";
 import { address, api, message, useProfile, type Shop } from "./data";
 import { Button, Card, Empty, Field, Screen, SearchBox, TabsRow, Txt, styles, usePalette } from "./ui";
@@ -129,6 +130,36 @@ interface Application extends Shop {
 }
 
 export function AdminDashboardDesign() {
+  const palette = usePalette();
+  const logout = useLogout();
+  const auth = useAuthStore();
+  const profile = useProfile();
+  const applications = useQuery({
+    queryKey: ["admin-shops", auth.user?.id], enabled: !!profile.data?.isAdmin,
+    queryFn: () => api.get<Application[]>("/admin/shops"), refetchInterval: 15000,
+  });
+  return <Screen title="Admin Dashboard" brandedHeader back={false} background={palette.surface}>
+    <View style={styles.stack}>
+      <View style={styles.between}>
+        <View style={{ flex: 1, gap: 4 }}><Txt style={styles.title}>Shop management</Txt><Txt style={styles.muted}>Monitor shop requests and delivery operations.</Txt></View>
+        <Button title="Sign Out" outline onPress={logout} />
+      </View>
+      <QueryState loading={applications.isLoading} error={applications.error} retry={() => applications.refetch()} />
+      <Card>
+        <Txt style={styles.heading}>Shop application requests</Txt>
+        <Txt style={styles.muted}>{applications.data ? `${applications.data.filter(shop => shop.approvalStatus === 'Pending').length} pending review` : 'Review shop requests and manage access.'}</Txt>
+        <Button title="View shop applications" onPress={() => router.push('/admin/applications')} />
+      </Card>
+      <Card>
+        <Txt style={styles.heading}>Delivery operations</Txt>
+        <Txt style={styles.muted}>Manage riders, assignments, and active deliveries.</Txt>
+        <Button title="Open delivery operations" outline onPress={() => router.push('/admin/operations')} />
+      </Card>
+    </View>
+  </Screen>;
+}
+
+export function AdminShopApplicationsDesign() {
   const logout = useLogout();
   const palette = usePalette();
   const { width } = useWindowDimensions();
@@ -173,10 +204,10 @@ export function AdminDashboardDesign() {
   const list = applications.data || [];
   const visible = list.filter(shop => (filter === "All" || shop.approvalStatus === filter)
     && `${shop.shopName} ${shop.user.name} ${shop.user.email} ${address(shop)}`.toLowerCase().includes(search.toLowerCase()));
-  return <Screen title="Admin Dashboard" brandedHeader back={false} background={palette.surface}>
+  return <Screen title="Shop Applications" brandedHeader back={false} background={palette.surface}>
     <View style={styles.stack}>
       <View style={styles.between}>
-        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Shop management</Txt><Txt style={styles.muted}>Review applications and manage shop access.</Txt></View>
+        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Shop application requests</Txt><Txt style={styles.muted}>Review applications and manage shop access.</Txt></View>
         <View style={[styles.row, { flexWrap: "wrap" }]}>
           <Button title="Sign Out" outline onPress={logout} />
         </View>
