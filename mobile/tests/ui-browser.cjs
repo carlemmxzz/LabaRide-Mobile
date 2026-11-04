@@ -24,6 +24,8 @@ const dispatchTest = process.argv.includes('--dispatch');
 const applicationTest = process.argv.includes('--application');
 const dialogTest = process.argv.includes('--dialogs');
 const logoutTest = process.argv.includes('--logout');
+const desktopSettingsTest = process.argv.includes('--desktop-settings');
+const settingsWrites = [];
 const scheduleTest = process.argv.includes('--schedule');
 const shopOrdersTest = process.argv.includes('--shop-orders');
 const liveOperationsTest = process.argv.includes('--live-operations');
@@ -54,6 +56,10 @@ if (servicesTest) {
 let notificationRecords = [], failNotificationDelete = false;
 const notificationDeletes = [];
 const shopDocumentFixture = [];
+if (desktopSettingsTest) {
+  shops[0].requirementsVersion = 1;
+  shopDocumentFixture.push(...['DTIRegistration','TinProof','MayorsPermit'].map(type=>({type,status:'Verified',updatedAt:'2026-11-04T00:00:00Z'})));
+}
 const requirementDocuments = ['ApplicantPhoto', 'ProfessionalLicense', 'Clearance', 'TinProof', 'OfficialReceipt', 'RegistrationCertificate'];
 const requirementFixture = { userId: 7, applicationStatus: 'Draft', registeredOwner: true, licenseNumber: 'TEST-PRO-123', licenseExpiry: '2030-12-31T00:00:00Z', motorcycleMake: 'Test brand', motorcycleModel: 'Test model', motorcycleYear: 2020, plateNumber: 'TEST123', missing: [], documents: requirementDocuments.map((type, index) => ({ id: index + 1, type, status: 'Pending', updatedAt: new Date().toISOString() })), user: { name: user.name, email: user.email, phone: '09123456789', birthdate: '1995-05-10T00:00:00Z', address_line_1: '123 Test Street', city: 'Naga', state_province: 'Camarines Sur', postal_code: '4400' } };
 const deliveryJobs = [
@@ -175,7 +181,7 @@ async function clickText(text) {
   await pause(150);
 }
 (async () => {
-  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest) {
+  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest || desktopSettingsTest) {
     const sharp = require('../../server/node_modules/sharp');
     photoBytes = await sharp({ create: { width: 240, height: 160, channels: 3, background: '#2457AD' } }).jpeg().toBuffer();
     fs.writeFileSync(path.join(artifacts,'upload-test.jpg'),photoBytes);
@@ -255,10 +261,17 @@ async function clickText(text) {
           || servicesTest && ['POST','PUT'].includes(request.method) && /^\/api\/shops\/101\/services(?:\/\d+)?$/.test(endpoint)
           || servicesTest && request.method === 'POST' && endpoint === '/api/shops/101/kilo-prices'
           || approvalTest && request.method === 'PUT' && ['/api/admin/shops/101/review','/api/shops/101/application'].includes(endpoint)
+          || desktopSettingsTest && request.method === 'PUT' && ['/api/users/7','/api/users/7/password','/api/shops/101'].includes(endpoint)
           || applicationTest && request.method === 'POST' && endpoint === '/api/auth/verify-token'
           || approvalTest && request.method === 'POST' && endpoint === '/api/auth/login', 'UI smoke tests must not mutate real records');
         if (mode === 'loading') await pause(2500);
         if (closing) return;
+        if (desktopSettingsTest && request.method === 'PUT') {
+          const body = JSON.parse(request.postData);
+          settingsWrites.push({ endpoint, body });
+          if (endpoint === '/api/users/7') Object.assign(user, body);
+          if (endpoint === '/api/shops/101') Object.assign(shops[0], body);
+        }
         if (manualTimersTest && request.method === 'PUT' && endpoint === '/api/transactions/42/timer') {
           const body=JSON.parse(request.postData);
           assert.deepEqual(Object.keys(body),['phase']);
@@ -318,7 +331,7 @@ async function clickText(text) {
           await command('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' }, { name: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' }], body: Buffer.from(JSON.stringify({ success: true, data })).toString('base64') });
           return;
         }
-        if (shopRequirementsTest && /^\/api\/shops\/101\/documents\/[^/]+$/.test(endpoint)) {
+        if ((shopRequirementsTest || desktopSettingsTest) && /^\/api\/shops\/101\/documents\/[^/]+$/.test(endpoint)) {
           const type = endpoint.split('/').at(-1);
           if (request.method === 'PUT') {
             assert.ok(JSON.parse(request.postData).imageBase64); assert.equal(user.isAdmin, false);
@@ -494,6 +507,74 @@ async function clickText(text) {
   });
   await command('Page.enable'); await command('Runtime.enable');
   await command('Fetch.enable',{ patterns:[{urlPattern:'*/api/*'}, ...(trackingTest || pullTest ? [{urlPattern:'*unpkg.com/leaflet*'}] : []), ...(pullTest?[{urlPattern:'https://api.mapbox.com/directions/*'}]:[])] });
+  if (desktopSettingsTest) {
+    for (const width of [390,1100,1440,1920]) {
+      for (const [route, expected, name] of [
+        ['/shop/profile','Account Information','overview'],
+        ['/shop/profile/account-information','Account Credibility','account'],
+        ['/shop/profile/shop-details','Contact Number *','shop'],
+        ['/shop/profile/security','Current Password','security'],
+        ['/shop/profile/change-password','Confirm New Password','password'],
+        ['/shop/profile/delete-account','Continue','delete'],
+      ]) {
+        await visit(route,width,expected,`shop-settings-${name}-${width}`);
+        assert.equal(await evaluate('!!document.querySelector("[data-testid=desktop-shop-settings]")'),width>=1100,'Desktop settings layout is restricted to desktop web');
+        if(width>=1100) {
+          const tabs=await evaluate(`Array.from(document.querySelectorAll('[data-testid="shop-settings-tabs"] [role="tab"]')).filter(e=>e.checkVisibility()).map(e=>({top:e.getBoundingClientRect().top,selected:e.getAttribute('aria-selected')}))`);
+          assert.equal(tabs.length,4);
+          assert.ok(tabs.every(tab=>Math.abs(tab.top-tabs[0].top)<2),'Settings tabs share a horizontal row');
+          assert.equal(tabs.filter(tab=>tab.selected==='true').length,1,'Exactly one settings tab is selected');
+          if(name==='account') {
+            await waitFor(`document.querySelectorAll('[data-testid="compact-shop-documents"] [data-testid^="shop-document-"]').length===3`);
+            assert.ok(await evaluate(`(()=>{const cards=Array.from(document.querySelectorAll('[data-testid="compact-shop-documents"] [data-testid^="shop-document-"]'));return cards.every(card=>Math.abs(card.getBoundingClientRect().top-cards[0].getBoundingClientRect().top)<2)})()`),'Verification documents share one compact row');
+          }
+        }
+      }
+    }
+    async function input(label, value) {
+      await evaluate(`(()=>{const e=document.querySelector('input[aria-label='+${JSON.stringify(JSON.stringify(label))}+']');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    }
+    await visit('/shop/profile',1440,'Account Information');
+    await clickText('Settings: Account Information'); await waitFor('document.body.innerText.includes("Personal information")');
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="Email Address"]').readOnly`),true,'Email stays read-only');
+    await evaluate(`document.querySelector('[data-testid="shop-document-DTIRegistration"] [role="button"]').click()`);
+    await waitFor(`!!document.querySelector('[data-testid="shop-document-DTIRegistration"] img')`);
+    await clickText('Enlarge document'); await waitFor(`!!document.querySelector('[aria-label="Enlarged private shop document"]')`);
+    await clickText('Close document'); await clickText('Hide private document');
+    await input('Name','Updated Shop Owner'); await input('Contact Number','09998887777');
+    await clickText('Save Changes'); await waitFor('document.body.innerText.includes("Changes saved successfully")');
+    assert.equal(settingsWrites[0].endpoint,'/api/users/7');
+    assert.equal(settingsWrites[0].body.name,'Updated Shop Owner');
+    assert.equal(settingsWrites[0].body.phone,'09998887777');
+    assert.equal(settingsWrites[0].body.email,undefined,'Read-only email is never submitted');
+    await clickText('Got it');
+    await visit('/shop/profile/shop-details',1440,'Business information');
+    await evaluate(`document.querySelector('[data-testid="compact-shop-address"]').scrollIntoView({block:'center'})`);
+    const addressShot=await command('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(artifacts,'shop-settings-address-1440.png'),Buffer.from(addressShot.data,'base64'));
+    await input('Contact Number *','09111222333');
+    await clickText('Save Changes'); await waitFor('document.body.innerText.includes("Changes saved. Your shop remains approved and visible.")');
+    assert.equal(settingsWrites[1].endpoint,'/api/shops/101');
+    assert.equal(settingsWrites[1].body.contactNumber,'09111222333');
+    await clickText('Settings: Security'); await waitFor('document.body.innerText.includes("Current Password")');
+    assert.ok(await evaluate(`(()=>{const e=document.querySelector('[aria-label="Two-factor authentication is not available"]');return e.matches(':disabled')||!!e.querySelector(':disabled')||e.getAttribute('aria-disabled')==='true'})()`),'Unavailable 2FA remains disabled');
+    await input('Current Password','isolated-old-password'); await input('New Password','isolated-new-password');
+    await clickText('Save'); await waitFor('document.body.innerText.includes("Password updated successfully")');
+    assert.equal(settingsWrites[2].endpoint,'/api/users/7/password');
+    assert.deepEqual(settingsWrites[2].body,{currentPassword:'isolated-old-password',newPassword:'isolated-new-password'});
+    await clickText('Got it');
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="New Password"]').value`),'','Password inputs clear after saving');
+    await clickText('Settings: Account Information'); await waitFor('document.body.innerText.includes("Personal information")');
+    await clickText('Delete Account'); await waitFor('document.body.innerText.includes("Permanently delete your account")');
+    await clickText('Cancel'); await waitFor('document.body.innerText.includes("Personal information")');
+    await clickText('Settings: Overview'); await waitFor('document.body.innerText.includes("Workspace & session")');
+    await clickText('Logout'); await waitFor('!!document.querySelector("[role=dialog]")'); await clickText('Cancel');
+    await clickText('Switch to User Mode'); await waitFor('location.pathname==="/profile"');
+    assert.equal(settingsWrites.length,3,'Navigation and cancelled actions do not write data');
+    assert.deepEqual(errors,[]);
+    console.log('PASS desktop shop settings: responsive pages, navigation, account/shop/password saves, read-only email, disabled 2FA, cancelled deletion/logout, and customer mode');
+    return;
+  }
   if (invoiceTest) {
     await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.invoiceExports=[];window.open=()=>({opener:null,document:{write:html=>window.invoiceExports.push(html),close:()=>{}}});` });
     async function checkInvoice(route, width, number, screenshot) {
@@ -740,7 +821,10 @@ async function clickText(text) {
   }
   if (shopRequirementsTest) {
     shops[0].requirementsVersion = 1; shops[0].approvalStatus = 'Pending'; user.isShopOwner = false;
-    async function rowClick(type, label) { await evaluate(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');Array.from(row.querySelectorAll('[role=button]')).find(button=>button.innerText.trim()===${JSON.stringify(label)}).click();})()`); await pause(150); }
+    async function rowClick(type, label) {
+      await waitFor(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');return !!row&&Array.from(row.querySelectorAll('[role=button]')).some(button=>button.innerText.trim()===${JSON.stringify(label)})})()`);
+      await evaluate(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');Array.from(row.querySelectorAll('[role=button]')).find(button=>button.innerText.trim()===${JSON.stringify(label)}).click();})()`); await pause(150);
+    }
     async function uploadShopDocument(type) {
       await rowClick(type, shopDocumentFixture.some(doc => doc.type === type) ? 'Replace document' : 'Upload document');
       await waitFor('!!document.querySelector("input[type=file]")');
@@ -761,6 +845,7 @@ async function clickText(text) {
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
       const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,`shop-documents-admin-${width}.png`),Buffer.from(shot.data,'base64'));
       await clickText('Cancel');
+      await waitFor('!document.querySelector("[aria-modal=true]")');
     }
     await clickText('Approve Shop');
     await rowClick('TinProof','Needs correction');
@@ -1207,6 +1292,22 @@ async function clickText(text) {
     }
     await clickText('Add Range'); await waitFor(closed);
     assert.deepEqual(priceRangeWrites[0],{minKilo:4,maxKilo:9,pricePerKilo:25.5});
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/services',width,'Weight-based pricing',`services-catalog-${width}`);
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid=service-weight-pricing]").length'),1,'Weight pricing has one consolidated section');
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid^=service-card-]").length'),3);
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-card-1]")).backgroundColor'),'rgb(255, 255, 255)','Desktop services use neutral cards');
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-accent-3]")).backgroundColor'),'rgb(92, 55, 76)','The saved service color is retained as an accent');
+      assert.ok(await evaluate('document.querySelector("[data-testid=service-weight-pricing]").innerText.includes("4 kg – 9 kg")'),'Saved ranges remain visible');
+    }
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Edit]").click()');
+    await waitFor(editor); await checkFit(false);
+    await input('Price per kilogram','36'); await clickText('Save Changes'); await waitFor(closed);
+    assert.equal(serviceWrites.at(-1).body.price,36,'Desktop editing saves the same service payload');
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Delete]").click()');
+    await waitFor('!!document.querySelector("[data-testid=app-dialog]")');
+    await clickText('Cancel'); await waitFor('!document.querySelector("[data-testid=app-dialog]")');
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=service-card-3]")'),'Cancelling deletion preserves the service');
     await clickText('Add Service'); await waitFor(editor);
     await command('Emulation.setDeviceMetricsOverride',{width:390,height:360,deviceScaleFactor:1,mobile:false});
     await pause(100); await checkFit(false);
@@ -1615,6 +1716,20 @@ async function clickText(text) {
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Compact fits viewport');
       const shot=await command('Page.captureScreenshot',{format:'png'});
       fs.writeFileSync(path.join(artifacts,`live-operations-compact-${width}.png`),Buffer.from(shot.data,'base64'));
+    }
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/transactions/shop-live-operations',width,'Workflow moves left to right',`live-operations-desktop-${width}`);
+      const stages = await evaluate(`Array.from(document.querySelectorAll('[data-testid^="live-stage-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.equal(stages.length,5);
+      assert.ok(stages.every(stage=>Math.abs(stage.y-stages[0].y)<2),'Desktop stages align horizontally');
+      assert.ok(stages.every((stage,index)=>!index||stage.x>stages[index-1].x),'Desktop workflow advances left to right');
+      const cards = await evaluate(`Array.from(document.querySelectorAll('[data-testid="live-stage-awaiting"] [data-testid^="live-order-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.ok(cards.length>1);
+      assert.ok(cards.every(card=>Math.abs(card.x-cards[0].x)<2),'Cards share the column width');
+      assert.ok(cards.every((card,index)=>!index||card.y>cards[index-1].y),'Cards stack vertically within a stage');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Desktop board scroll stays inside its container');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
     }
     // Refreshed server state moves the same card and removes completed work.
     orders[0].status = 'Queued';

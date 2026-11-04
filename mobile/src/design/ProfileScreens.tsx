@@ -43,6 +43,7 @@ import { useLaundryDraft } from "./store";
 import { ProfilePhotoControl } from "./ProfilePhotoControl";
 import { useLogout } from "./useLogout";
 import { ShopAccountCredibility } from './ShopRequirements';
+import { DesktopShopSettings, SettingsSaveBar, SettingsSection, useDesktopShopSettings } from './DesktopShopSettings';
 
 export function UserProfileDesign() {
   const logout = useLogout();
@@ -144,6 +145,7 @@ function ProfileAction({ title, asset, onPress }: { title: string; asset: "locat
   </Pressable>;
 }
 export function EditProfileDesign({ account = false }: { account?: boolean }) {
+  const desktop = useDesktopShopSettings();
   const palette = usePalette();
   const { go } = useFlowNavigation();
   const profile = useProfile();
@@ -206,6 +208,20 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
       setBusy(false);
     }
   }
+  if (desktop && account) return <DesktopShopSettings title="Account information" description="Manage your personal details and shop verification records." active="account">
+    <QueryState loading={profile.isLoading} error={profile.error} retry={() => profile.refetch()} />
+    <SettingsSection title="Personal information" description="Keep your name and contact number current so we can reach you.">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: palette.line }}>
+        <View style={{ width: 48, height: 48, borderRadius: 15, backgroundColor: palette.soft, alignItems: 'center', justifyContent: 'center' }}><Txt style={{ fontSize: 18, fontWeight: '700', color: palette.primary }}>{(values.name || auth.user?.name || 'A').trim().split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase()}</Txt></View>
+        <View style={{ flex: 1, minWidth: 0 }}><Txt style={{ fontSize: 15, fontWeight: '600' }}>{values.name || auth.user?.name}</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>{values.email || auth.user?.email}</Txt></View>
+        <Txt style={{ fontSize: 12, color: palette.muted }}>Account #{auth.user?.id}</Txt>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 16 }}>{[{ key: 'name', label: 'Name' }, { key: 'phone', label: 'Contact Number' }, { key: 'email', label: 'Email Address' }].map(field => <View key={field.key} style={{ flex: 1, minWidth: 0 }}><Field compact label={field.label} keyboardType={field.key === 'phone' ? 'phone-pad' : field.key === 'email' ? 'email-address' : 'default'} value={values[field.key] || ''} editable={field.key !== 'email'} onChangeText={value => setValues(current => ({ ...current, [field.key]: value }))} />{field.key === 'email' && <Txt style={{ fontSize: 11, color: palette.muted, marginTop: 6 }}>Your sign-in email is read-only.</Txt>}</View>)}</View>
+      <SettingsSaveBar onSave={save} busy={busy} />
+    </SettingsSection>
+    <ShopAccountCredibility compact />
+    <Card style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16 }}><View style={{ flex: 1, gap: 2 }}><Txt style={{ fontSize: 14, fontWeight: '600' }}>Account access</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>Manage your password or close your account.</Txt></View><Button title="Change Password" compact outline onPress={() => go('change-password')} /><Button title="Delete Account" compact outline color={palette.danger} onPress={() => go('delete-account')} /></Card>
+  </DesktopShopSettings>;
   return (
     <Screen
       title={account ? "Account Information" : "Profile"}
@@ -424,6 +440,7 @@ export function ChangePasswordDesign({
 }: {
   security?: boolean;
 }) {
+  const desktop = useDesktopShopSettings();
   const palette = usePalette();
   const { go } = useFlowNavigation();
   const [current, setCurrent] = useState("");
@@ -455,6 +472,17 @@ export function ChangePasswordDesign({
       setBusy(false);
     }
   }
+  if (desktop) return <DesktopShopSettings title={security ? 'Security' : 'Change password'} description="Manage the password you use to sign in to your account." active="security">
+    <SettingsSection title="Change Password" description="Enter your current password and choose a new password with at least 6 characters.">
+      <View style={{ maxWidth: 520, gap: 16 }}>
+        <Field compact label="Current Password" password placeholder="Enter current password" value={current} onChangeText={setCurrent} autoComplete="current-password" />
+        <Field compact label="New Password" password placeholder="Enter new password" value={password} onChangeText={setPassword} autoComplete="new-password" />
+        {!security && <Field compact label="Confirm New Password" password placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} autoComplete="new-password" />}
+      </View>
+      <SettingsSaveBar title={security ? 'Save' : 'Confirm'} onSave={save} busy={busy} />
+    </SettingsSection>
+    {security && <SettingsSection title="Two-factor Authentication" description="An additional verification step when signing in."><View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}><View style={{ flex: 1, gap: 4 }}><Txt style={{ fontSize: 12, fontWeight: '600', color: palette.muted }}>Not available yet</Txt><Txt style={{ fontSize: 13, color: palette.muted }}>Two-factor authentication is not available yet.</Txt></View><Switch value={false} disabled accessibilityLabel="Two-factor authentication is not available" trackColor={{ false: '#D1D5DB', true: palette.primary }} /></View></SettingsSection>}
+  </DesktopShopSettings>;
   return (
     <Screen
       title={security ? "Security" : "Change Password"}
@@ -515,6 +543,7 @@ export function ChangePasswordDesign({
   );
 }
 export function AccountConfirmationDesign() {
+  const desktop = useDesktopShopSettings();
   const palette = usePalette();
   const { replaceFlow } = useFlowNavigation();
   const [busy, setBusy] = useState(false);
@@ -533,6 +562,7 @@ export function AccountConfirmationDesign() {
       setBusy(false);
     }
   }
+  if (desktop) return <DesktopShopSettings title="Delete account" description="Review this permanent account action before continuing." active="account"><SettingsSection title="Permanently delete your account" description="This action cannot be undone."><View style={{ padding: 16, borderRadius: 12, backgroundColor: '#FFF1F2', gap: 8 }}><Txt style={{ fontSize: 14, fontWeight: '600', color: palette.danger }}>Are you sure you want to delete your account?</Txt><Txt style={{ fontSize: 13, color: palette.muted }}>Deleting your account removes your access to LabaRide and signs you out. Only continue if you intend to permanently close your account.</Txt></View><View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}><Button title="Cancel" compact outline onPress={() => router.back()} /><Button title="Continue" compact color={palette.danger} busy={busy} onPress={confirm} /></View></SettingsSection></DesktopShopSettings>;
   return (
     <Screen scroll={false} background={palette.surface}>
       <View style={[styles.grow, styles.center]}>

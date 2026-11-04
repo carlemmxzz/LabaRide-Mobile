@@ -9,7 +9,7 @@ import { Button, Card, Txt, usePalette, styles } from "./ui";
 import { FormError } from "./AddressFields";
 import { ShopPhoto } from "./ShopPhoto";
 
-export function ShopPhotoEditor({ shop }: { shop: Shop }) {
+export function ShopPhotoEditor({ shop, compact = false }: { shop: Shop; compact?: boolean }) {
   const palette = usePalette();
   const cache = useQueryClient();
   const active = useRef(false);
@@ -52,14 +52,14 @@ export function ShopPhotoEditor({ shop }: { shop: Shop }) {
     } catch (failure) { setError(message(failure)); }
     finally { active.current = false; setBusy(false); }
   }
-  return <Card>
-    <Txt style={styles.heading}>Shop photo</Txt>
-    <Txt style={styles.muted}>Show customers your storefront or laundry space. Choose a JPG, PNG or WebP photo up to 6 MB.</Txt>
-    <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} style={{ maxHeight: 280 }} />
+  return <Card style={compact ? { padding: 18, gap: 10, borderRadius: 14 } : undefined}>
+    <Txt style={compact ? { fontSize: 15, fontWeight: '700' } : styles.heading}>Shop photo</Txt>
+    <Txt style={compact ? { fontSize: 12, lineHeight: 18, color: palette.muted } : styles.muted}>{compact ? 'Your storefront photo. JPG, PNG or WebP, up to 6 MB.' : 'Show customers your storefront or laundry space. Choose a JPG, PNG or WebP photo up to 6 MB.'}</Txt>
+    <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} style={{ maxHeight: compact ? 110 : 280 }} />
     <View style={[styles.row, { flexWrap: "wrap" }]}>
-      <Button title={shop.photoUrl ? "Change shop photo" : "Upload shop photo"} busy={busy} onPress={upload}
+      <Button title={shop.photoUrl ? "Change shop photo" : "Upload shop photo"} compact={compact} busy={busy} onPress={upload}
         icon={<Camera size={18} color="white" />} />
-      {!!shop.photoUrl && <Button title="Remove photo" outline disabled={busy} color={palette.danger} onPress={remove}
+      {!!shop.photoUrl && <Button title="Remove photo" compact={compact} outline disabled={busy} color={palette.danger} onPress={remove}
         icon={<Trash2 size={18} color={palette.danger} />} />}
     </View>
     <FormError error={error} />

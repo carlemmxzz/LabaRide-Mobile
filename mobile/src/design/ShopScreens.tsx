@@ -23,6 +23,8 @@ import { router, Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
+import { DesktopShopSettings, SettingsLink, SettingsSaveBar, SettingsSection, useDesktopShopSettings } from './DesktopShopSettings';
+import { ServiceCatalog } from './ServiceCatalog';
 import {
   Asset,
   IconButton,
@@ -590,11 +592,39 @@ export function DeclineOrderDesign({
   );
 }
 export function ShopProfileDesign() {
+  const desktop = useDesktopShopSettings();
   const logout = useLogout();
   const palette = usePalette();
   const { go } = useFlowNavigation();
   const owned = useOwnedShop();
   const shop = owned.data;
+  if (desktop) return <DesktopShopSettings title="Shop profile" description="Manage your business identity, account information, and security." active="overview">
+    <QueryState loading={owned.isLoading} error={owned.error} retry={() => owned.refetch()} />
+    <Card style={{ padding: 24, borderRadius: 18, gap: 24 }}>
+      <View style={{ flexDirection: 'row', gap: 24, alignItems: 'center' }}>
+        <ShopPhoto name={shop?.shopName || 'Your shop'} photoUrl={shop?.photoUrl} style={{ width: 156, height: 132, aspectRatio: undefined, borderRadius: 14 }} />
+        <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+          <Txt style={{ fontSize: 11, fontWeight: '600', color: palette.muted, letterSpacing: 0.8 }}>BUSINESS PROFILE</Txt>
+          <Txt style={{ fontSize: 23, fontWeight: '700', lineHeight: 30 }}>{shop?.shopName || 'Your shop'}</Txt>
+          {!!shop?.approvalStatus && <View style={{ alignSelf: 'flex-start', backgroundColor: shop.approvalStatus === 'Approved' ? '#ECFDF3' : palette.soft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7 }}><Txt style={{ fontSize: 11, fontWeight: '600', color: shop.approvalStatus === 'Approved' ? '#166534' : palette.primary }}>{shop.approvalStatus}</Txt></View>}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Clock size={15} color={palette.muted} /><Txt style={{ fontSize: 13, color: palette.muted }}>{shop?.openingTime || 'Hours not set'}{shop?.closingTime ? ` – ${shop.closingTime}` : ''} · PHT</Txt></View>
+          <Button title="Edit shop details" compact outline style={{ alignSelf: 'flex-start', marginTop: 2 }} onPress={() => go('shop-details')} />
+        </View>
+      </View>
+      <View style={{ borderTopWidth: 1, borderTopColor: palette.line, paddingTop: 18, flexDirection: 'row', gap: 24 }}>
+        <View style={{ flex: 2, gap: 4 }}><Txt style={{ fontSize: 11, color: palette.muted, fontWeight: '600' }}>SHOP ADDRESS</Txt><Txt style={{ fontSize: 13 }}>{address(shop) || 'Add your shop address in Shop Details.'}</Txt></View>
+        <View style={{ flex: 1, gap: 4 }}><Txt style={{ fontSize: 11, color: palette.muted, fontWeight: '600' }}>CONTACT NUMBER</Txt><Txt selectable style={{ fontSize: 13 }}>{shop?.contactNumber || 'Not provided'}</Txt></View>
+      </View>
+    </Card>
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+      <SettingsLink title="Account Information" description="Update your name and contact details. View your shop verification documents." onPress={() => go('account-information')} />
+      <SettingsLink title="Shop Details" description="Manage your storefront photo, business hours, location, and service areas." onPress={() => go('shop-details')} />
+      <SettingsLink title="Security" description="Change your password and review available account protection settings." onPress={() => go('security')} />
+    </View>
+    <SettingsSection title="Workspace & session" description="Switch to your customer account or sign out of LabaRide.">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}><Button title="Switch to User Mode" compact outline icon={<UserRound size={16} color={palette.primary} />} onPress={() => router.replace('/(user)/profile')} /><Button title="Logout" compact outline color={palette.danger} onPress={logout} /></View>
+    </SettingsSection>
+  </DesktopShopSettings>;
   return (
     <Screen title="Shop Profile" back={false} background={palette.surface} padded={false}>
       <View style={{ height: 300, position: "relative", backgroundColor: "#17151B" }}>
@@ -629,6 +659,7 @@ export function ShopProfileDesign() {
   );
 }
 export function ShopDetailsFormDesign() {
+  const desktop = useDesktopShopSettings();
   const palette = usePalette();
   const owned = useOwnedShop();
   const cache = useQueryClient();
@@ -674,6 +705,34 @@ export function ShopDetailsFormDesign() {
     } catch (failure) { setError(message(failure)); }
     finally { setBusy(false); }
   }
+  if (desktop) return <DesktopShopSettings title="Shop details" description="Keep your storefront, operating hours, and service coverage up to date." active="shop">
+    <QueryState loading={owned.isLoading} error={owned.error} retry={() => owned.refetch()} />
+    <View style={{ padding: 14, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE8B5', gap: 4 }}><Txt style={{ fontSize: 12, fontWeight: '600', color: '#92400E' }}>Changes that require review</Txt><Txt style={{ fontSize: 12, lineHeight: 20, color: '#92400E' }}>Changing your shop name or location requires admin approval and pauses your listing and shop mode. Hours, contact details, and service areas update immediately.</Txt></View>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <SettingsSection title="Business information" description="The details customers use to identify and contact your shop.">
+          <View style={{ flexDirection: 'row', gap: 16 }}><View style={{ flex: 2 }}><Field compact label="Shop Name *" value={values.shopName || ''} onChangeText={shopName => setValues(current => ({ ...current, shopName }))} /></View><View style={{ flex: 1 }}><Field compact label="Shop ID" value={String(owned.data?.id || '')} editable={false} /></View></View>
+          <Field compact label="Contact Number *" keyboardType="phone-pad" value={values.contactNumber || ''} onChangeText={contactNumber => setValues(current => ({ ...current, contactNumber }))} />
+        </SettingsSection>
+      </View>
+      <View style={{ flex: 1.25, minWidth: 0 }}>
+        <SettingsSection title="Business hours" description="Operating times use Philippine time (PHT).">
+          <Choice label="Accept orders during business hours" selected={values.acceptingOrders !== 'false'} onPress={() => setValues(current => ({ ...current, acceptingOrders: current.acceptingOrders === 'false' ? 'true' : 'false' }))} />
+          <Txt style={{ fontSize: 12, color: palette.muted }}>Turn off to pause new bookings without changing your saved hours.</Txt>
+          <View style={{ flexDirection: 'row', gap: 16 }}>{[['openingTime', 'Opening Time *', '08:00'], ['closingTime', 'Closing Time *', '18:00']].map(([key, label, initialValue]) => <View key={key} style={{ flex: 1, minWidth: 0 }}><PickerField label={label} mode="time" value={values[key] || ''} initialValue={initialValue} onChange={value => setValues(current => ({ ...current, [key]: value }))} /></View>)}</View>
+        </SettingsSection>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {owned.data && <ShopPhotoEditor shop={owned.data} compact />}
+      </View>
+    </View>
+    <SettingsSection title="Service areas" description="Straight-line distances from your shop’s pin. Blank minimum = 0 km; blank maximum = no limit.">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}><Choice label="Offer laundry collection from customers" selected={values.pickupEnabled === 'true'} onPress={() => setValues(current => ({ ...current, pickupEnabled: current.pickupEnabled === 'true' ? 'false' : 'true' }))} /><Txt style={{ flex: 1, fontSize: 12, lineHeight: 18, color: palette.muted }}>Collection covers unwashed laundry. Customer collection of finished laundry at your shop has no distance limit.</Txt></View>
+      <View style={{ flexDirection: 'row', gap: 14 }}>{distanceFields.filter(field => !field.startsWith('pickup') || values.pickupEnabled === 'true').map(field => <View key={field} style={{ flex: 1, minWidth: 0 }}><Field compact label={`${field.startsWith('delivery') ? 'Delivery' : 'Collection'} ${field.includes('Min') ? 'minimum' : 'maximum'} distance (km)`} keyboardType="decimal-pad" suffix="km" placeholder={field.includes('Min') ? '0' : 'No limit'} value={values[field] || ''} onChangeText={value => setValues(current => ({ ...current, [field]: value }))} /></View>)}</View>
+    </SettingsSection>
+    <SettingsSection title="Shop address" description="Set the physical address and map pin for your laundry shop."><AddressFields columns={2} values={values} setValues={setValues} /></SettingsSection>
+    <SettingsSaveBar onSave={save} busy={busy}>{!!savedMessage && <Txt accessibilityLiveRegion="polite" style={{ color: palette.primary }}>{savedMessage}</Txt>}<FormError error={error} /></SettingsSaveBar>
+  </DesktopShopSettings>;
   return <Screen title="Shop Details" background={palette.surface} footer={<View>
     <FormError error={error} /><Button title="Save Changes" color={palette.navy} busy={busy} onPress={save} />
   </View>}>
@@ -711,6 +770,8 @@ export function ShopDetailsFormDesign() {
 }
 export function ServicesDesign() {
   const palette = usePalette();
+  const { width: servicesWidth } = useWindowDimensions();
+  const desktop = Platform.OS === 'web' && servicesWidth >= 1100;
   const insets = useSafeAreaInsets();
   const owned = useOwnedShop();
   const detail = useShop(owned.data?.id || 0);
@@ -832,12 +893,14 @@ export function ServicesDesign() {
     <Screen
       title="Services"
       back={false}
+      dark={desktop ? false : undefined}
+      maxWidth={desktop ? 1500 : 1200}
       right={
-        <Button title="Add Service" compact color="white" textColor={palette.primary} disabled={busy}
-          icon={<Plus size={18} color={palette.primary} />} onPress={() => open("service")} />
+        <Button title="Add Service" compact color={desktop ? palette.primary : 'white'} textColor={desktop ? 'white' : palette.primary} disabled={busy}
+          icon={<Plus size={18} color={desktop ? 'white' : palette.primary} />} onPress={() => open("service")} />
       }
     >
-      <View style={[styles.stack, { width: "100%", maxWidth: 1100, alignSelf: "center" }]}>
+      <View style={[styles.stack, { width: "100%", maxWidth: desktop ? 1500 : 1100, alignSelf: "center" }]}>
         <QueryState
           loading={owned.isLoading || detail.isLoading}
           error={owned.error || detail.error}
@@ -846,8 +909,9 @@ export function ServicesDesign() {
             detail.refetch();
           }}
         />
-        <Section title="YOUR SERVICES" />
         {!dialog && <FormError error={error} />}
+        {desktop ? <ServiceCatalog services={shop?.services || []} ranges={shop?.kiloPrices || []} busy={busy} ready={!owned.isLoading && !detail.isLoading && !owned.error && !detail.error} edit={service => open('service', service)} remove={removeService} add={() => open('service')} addRange={() => open('price')} /> : <>
+        <Section title="YOUR SERVICES" />
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {shop?.services?.map((service) => {
             const cardColors = serviceCardColors(service.color, palette.primary);
@@ -936,6 +1000,7 @@ export function ServicesDesign() {
             style={{ alignSelf: "flex-start" }}
           />
         </Card>
+        </>}
       </View>
       <Modal visible={!!dialog} transparent animationType="none" onRequestClose={() => { if (!busy) setDialog(null); }}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
@@ -943,7 +1008,7 @@ export function ServicesDesign() {
             flex: 1, backgroundColor: "#00000070", alignItems: "center", justifyContent: "center",
             paddingHorizontal: 14, paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16),
           }}>
-            <Card testID="service-editor" style={{ width: "100%", maxWidth: 440, maxHeight: "100%", flexShrink: 1, padding: 18, gap: 12 }}>
+            <Card testID="service-editor" style={{ width: "100%", maxWidth: desktop ? 540 : 440, maxHeight: "100%", flexShrink: 1, padding: desktop ? 24 : 18, borderRadius: desktop ? 20 : 16, gap: 12 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <Txt accessibilityRole="header" style={styles.heading}>
                   {editing ? "Edit" : "Add"} {dialog === "service" ? "Service" : "Price Range"}
@@ -954,6 +1019,7 @@ export function ServicesDesign() {
                   <X size={20} color={palette.primary} />
                 </Pressable>
               </View>
+              {desktop && <Txt style={{ fontSize: 12, lineHeight: 18, color: palette.muted }}>{dialog === 'service' ? 'Set the price, load capacity, processing times, and identifying color.' : 'Choose the weight interval and the rate charged per kilogram.'}</Txt>}
               <ScrollView testID="service-editor-body" style={{ flexShrink: 1, flexGrow: 0, minHeight: 0 }}
                 keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ gap: 12, paddingBottom: 2 }}>
