@@ -28,6 +28,7 @@ export function addressValues(value?: AddressData | null, type: AddressType = "H
   ])), ...(value?.latitude != null && value?.longitude != null ? { latitude: String(value.latitude), longitude: String(value.longitude) } : {}) };
 }
 export function addressError(value?: AddressData | Record<string, string> | null): string | null {
+  if (value && 'pinNeedsConfirmation' in value && value.pinNeedsConfirmation === 'true') return 'Your address changed. Move the pin to the new address or confirm the existing pin still matches before saving.';
   const labels = {
     address_line_1: "Street number and street name", city: "City or municipality",
     state_province: "State, province, or region", postal_code: "ZIP or postal code", country: "Country",

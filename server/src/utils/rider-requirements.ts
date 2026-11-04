@@ -12,6 +12,8 @@ export function ageOnDate(value: Date | string, today = new Date()) {
 }
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, 'Choose a valid date');
 export const riderDetailsSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  phone: z.string().trim().regex(/^\+?[0-9][0-9\s()-]{8,19}$/, 'Enter a valid contact number'),
   birthdate: date.refine(value => ageOnDate(value) >= 18, 'Applicants must be at least 18 years old'),
   address_line_1: z.string().trim().min(1).max(200), city: z.string().trim().min(1).max(100),
   state_province: z.string().trim().min(1).max(100), postal_code: z.string().trim().min(1).max(20),
@@ -22,12 +24,13 @@ export const riderDetailsSchema = z.object({
   plateNumber: z.string().trim().min(2).max(30), registeredOwner: z.boolean(),
 });
 
-type Application = { licenseNumber: string | null; licenseExpiry: Date | null; motorcycleMake: string | null; motorcycleModel: string | null; motorcycleYear: number | null; plateNumber: string | null; registeredOwner: boolean; user: { birthdate: Date | null; address_line_1: string | null; city: string | null; state_province: string | null; postal_code: string | null }; documents: { type: string; status: string }[] };
+type Application = { licenseNumber: string | null; licenseExpiry: Date | null; motorcycleMake: string | null; motorcycleModel: string | null; motorcycleYear: number | null; plateNumber: string | null; registeredOwner: boolean; user: { name: string; phone: string | null; birthdate: Date | null; address_line_1: string | null; city: string | null; state_province: string | null; postal_code: string | null }; documents: { type: string; status: string }[] };
 export function requiredDocuments(registeredOwner: boolean) {
   return documentTypes.filter(type => type !== 'OwnerAuthorization' || !registeredOwner);
 }
 export function requirementsMissing(profile: Application, verified = false) {
   const missing: string[] = [];
+  if (!riderDetailsSchema.shape.name.safeParse(profile.user.name).success || !riderDetailsSchema.shape.phone.safeParse(profile.user.phone).success) missing.push('Name and valid contact number');
   if (!profile.user.birthdate || !Number.isFinite(profile.user.birthdate.getTime()) || ageOnDate(profile.user.birthdate) < 18) missing.push('Birthdate (18 or older)');
   if (!profile.user.address_line_1 || !profile.user.city || !profile.user.state_province || !profile.user.postal_code) missing.push('Complete home address');
   if (!profile.licenseNumber || !profile.licenseExpiry || profile.licenseExpiry.toISOString().slice(0, 10) < new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)) missing.push('Valid professional license details');

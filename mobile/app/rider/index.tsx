@@ -1,1 +1,1 @@
-export { RiderAvailableJobsDesign as default } from '../../src/design/RiderAvailableJobs';
+export { RiderOverviewDashboardDesign as default } from '../../src/design/RiderOverviewDashboard';

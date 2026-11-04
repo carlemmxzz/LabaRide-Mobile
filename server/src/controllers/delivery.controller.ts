@@ -88,7 +88,7 @@ export class DeliveryController {
         if (!rider.online) fail('Go online before claiming a job.');
         const workload = await tx.deliveryAssignment.count({ where: { riderId: actor(req), status: { in: openAssignments } } });
         if (workload >= 3) fail('You already have three active jobs. Finish a job before claiming another.');
-        const assignment = await tx.deliveryAssignment.create({ data: { transactionId: id, riderId: actor(req), stage, status: 'Accepted', resumeStatus: order.workflowStatus, expiresAt: new Date() } });
+        const assignment = await tx.deliveryAssignment.create({ data: { transactionId: id, riderId: actor(req), stage, status: 'Accepted', acceptedAt: new Date(), resumeStatus: order.workflowStatus, expiresAt: new Date() } });
         await changeState(tx, order, actor(req), 'JobClaimed', `${stage}Accepted`, 'Rider claimed this job from Available Jobs.', actor(req));
         return { id, assignmentId: assignment.id };
       });
@@ -261,7 +261,7 @@ export class DeliveryController {
         if (job.status !== 'Offered') fail(`This assignment is already ${job.status.toLowerCase()}. Refresh your jobs.`);
         if (body.action === 'accept' && order.shop.approvalStatus !== 'Approved') fail('Shop access is paused');
         if (body.action === 'decline' && !body.reason) fail('Enter a reason for declining', 400);
-        await tx.deliveryAssignment.update({ where: { id }, data: { status: body.action === 'accept' ? 'Accepted' : 'Declined' } });
+        await tx.deliveryAssignment.update({ where: { id }, data: { status: body.action === 'accept' ? 'Accepted' : 'Declined', ...(body.action === 'accept' ? { acceptedAt: new Date() } : {}) } });
         const base = job.stage === 'Pickup' ? 'PickupQueued' : 'ReadyForDelivery';
         const resume = job.resumeStatus || base;
         const to = body.action === 'accept' ? resume === base ? `${job.stage}Accepted` : resume : resume;
@@ -348,7 +348,7 @@ export class DeliveryController {
             if (!assigned) fail('Only the assigned rider can confirm receipt', 403);
             if (!handoff.arrived || !handoff.released) fail('Wait for the customer or shop to confirm the handover');
             const to = handoff.kind === 'pickup' ? 'LaundryPickedUp' : handoff.kind === 'collection' ? 'CleanLaundryCollected' : 'Completed';
-            if (handoff.kind === 'delivery') await tx.deliveryAssignment.update({ where: { id: job!.id }, data: { status: 'Completed', ...clearedRiderLocation } });
+            if (handoff.kind === 'delivery') await tx.deliveryAssignment.update({ where: { id: job!.id }, data: { status: 'Completed', completedAt: new Date(), ...clearedRiderLocation } });
             await changeState(tx, order, actor(req), 'HandoffReceived', to, handoff.marker, handoff.riderId);
           }
           return;
@@ -414,7 +414,7 @@ export class DeliveryController {
           if (!req.user!.isRider || !job || !transition || job.stage !== transition.stage) fail('Only the assigned rider can perform this action', 403);
           if (order.workflowStatus !== transition.from) fail('Complete the previous delivery step first');
           if (transition.proof && body.code !== order[transition.proof]) fail('The confirmation code is incorrect', 400);
-          if (transition.done) await tx.deliveryAssignment.update({ where: { id: job.id }, data: { status: 'Completed', ...clearedRiderLocation } });
+          if (transition.done) await tx.deliveryAssignment.update({ where: { id: job.id }, data: { status: 'Completed', completedAt: new Date(), ...clearedRiderLocation } });
           to = transition.to;
         }
         await changeState(tx, order, actor(req), body.action, to!, body.note, job?.riderId);

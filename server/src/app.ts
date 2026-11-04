@@ -1,3 +1,4 @@
+import { HandoverPhotoController } from './controllers/handover-photo.controller';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -32,6 +33,7 @@ app.put('/api/users/:userId/photo', authenticateToken, express.json({ limit: '9m
 app.put('/api/delivery/application/documents/:type', authenticateToken, express.json({ limit: '9mb' }), RiderApplicationController.upload);
 app.put('/api/delivery/orders/:id/weight', authenticateToken, express.json({ limit: '9mb' }), DeliveryController.updateWeight);
 app.put('/api/shops/:shopId/documents/:type', authenticateToken, express.json({ limit: '9mb' }), ShopDocumentController.upload);
+app.put('/api/delivery/assignments/:id/photos', authenticateToken, express.json({ limit: '9mb' }), HandoverPhotoController.upload);
 app.use(express.json());
 
 // Routes

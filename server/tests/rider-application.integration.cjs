@@ -68,6 +68,12 @@ async function main() {
         assert.equal(privateImage.status, 200); assert.match(privateImage.headers.get('cache-control'), /no-store/);
         const outsider = await tx.user.create({ data: { name: 'Document Outsider', email: `outsider-${email}`, password: 'test-only' } });
         const outsiderToken = jwt.sign({ userId: outsider.id }, env.JWT_SECRET);
+        await request('/delivery/application', 'POST', {}, null, 401);
+        await request('/delivery/application', 'POST', { active: true, applicationStatus: 'Approved' }, outsiderToken, 403);
+        assert.equal(await tx.riderProfile.findUnique({ where: { userId: outsider.id } }), null);
+        await request('/delivery/application', 'PUT', { phone: '09123456789' }, outsiderToken, 404);
+        await request('/auth/rider-signup', 'POST', { ...input, email: outsider.email }, null, 409);
+        await request('/delivery/application', 'POST', {}, submitted.token, 403);
         assert.equal((await fetch(imageUrl, { headers: { Authorization: `Bearer ${outsiderToken}` } })).status, 403);
         await request(`/delivery/riders/${submitted.user.id}/review`, 'PUT', { status: 'Approved' }, adminToken, 400);
         // Rejection feedback blocks submission until a replacement is uploaded.
@@ -88,6 +94,8 @@ async function main() {
         const jobs = await request('/delivery/rider', 'GET', undefined, submitted.token);
         assert.equal(jobs.rider.active, true);
         assert.equal(jobs.rider.reviewedById, admin.id);
+        await request('/delivery/application', 'POST', {}, submitted.token, 403);
+        await request('/transactions', 'POST', {}, submitted.token, 403);
         const second = await request('/auth/rider-signup', 'POST', { ...input, email: `second-${email}` }, null, 201);
         await tx.riderProfile.update({ where: { userId: second.user.id }, data: { applicationStatus: 'Pending' } });
         await request(`/delivery/riders/${second.user.id}/review`, 'PUT', { status: 'Rejected' }, adminToken, 400);

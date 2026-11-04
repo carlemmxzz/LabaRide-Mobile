@@ -6,8 +6,9 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const React = require('react');
 
+const designRoot = fs.existsSync(path.join(__dirname, '../src/design/OrderScreens.tsx')) ? path.join(__dirname, '../src/design') : __dirname;
 function load(file) {
-  const source = fs.readFileSync(path.join(__dirname, '../src/design', file), 'utf8');
+  const source = fs.readFileSync(path.join(designRoot, file), 'utf8');
   const output = { exports: {} };
   new Function('module', 'exports', ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
@@ -18,7 +19,7 @@ const addressHelpers = load('address.ts');
 const scheduleHelpers = load('schedule.ts');
 function deliveryLoad(file) {
  const module = { exports: {} };
- const source = fs.readFileSync(path.join(__dirname, '../src/design', file), 'utf8');
+ const source = fs.readFileSync(path.join(designRoot, file), 'utf8');
  new Function('module','exports','require',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(module,module.exports,name=>load(name.slice(2)+'.ts'));
  return module.exports;
 }
@@ -26,7 +27,7 @@ const slotsHelpers = deliveryLoad('delivery-slots.ts');
 const { orderPricing } = load('order-pricing.ts');
 const areaHelpers = load('service-area.ts');
 const hoursHelpers = load('shop-hours.ts');
-const screenSource = fs.readFileSync(path.join(__dirname, '../src/design/OrderScreens.tsx'), 'utf8');
+const screenSource = fs.readFileSync(path.join(designRoot, 'OrderScreens.tsx'), 'utf8');
 const ast = ts.createSourceFile('OrderScreens.tsx', screenSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const names = ['OrderSummaryDesign', 'CheckoutDesign'];
 const source = names.map(name => ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name.text === name).getText(ast)).join('\n');
@@ -117,7 +118,7 @@ function harness({ guest = false, request, failure, saved = [], storageFailure, 
     palette: { navy: 'navy', surface: 'surface' }, styles: {},
   };
   for (const name of ['Screen', 'Button', 'View', 'FormError', 'Field', 'Txt', 'Card', 'Pressable', 'Asset',
-    'Plus', 'Minus', 'Pencil', 'ChevronDown', 'CheckCircle2', 'Clock', 'Section', 'Empty', 'QueryState', 'MenuRow', 'Modal', 'ScrollView', 'Choice', 'PaymentDropdown', 'AddressFields', 'DeliveryDetails', 'ScheduleDesign', 'PriceRow', 'Totals']) context[name] = name;
+    'Plus', 'Minus', 'Pencil', 'ChevronDown', 'CheckCircle2', 'Clock', 'Section', 'Empty', 'QueryState', 'MenuRow', 'Modal', 'ScrollView', 'Choice', 'PaymentDropdown', 'AddressFields', 'DeliveryDetails', 'ScheduleDesign', 'CheckoutAddressEditor', 'PriceRow', 'Totals']) context[name] = name;
   context.usePalette = () => context.palette;
   vm.runInNewContext(compiled, context);
   const render = () => { index = 0; return context.exports.CheckoutDesign(); };
@@ -381,9 +382,9 @@ test('transport choices share one address and missing pins have an action that o
   assert.equal(choices.length, 4);
   assert.equal(choices.filter(item => item.props.accessibilityState.checked).length, 1);
   assert.equal(choices.find(item => item.props.accessibilityState.checked).props.accessibilityLabel, 'Pickup & delivery');
-  app.button('Manage addresses').props.onPress();
-  assert.deepEqual(JSON.parse(JSON.stringify(app.navigation)), [['addresses', { checkout: 'true' }]]);
-  assert.equal(elements(app.render(), 'AddressFields').length, 0);
+  app.button('Update address & map pin').props.onPress();
+  assert.equal(app.navigation.length, 0);
+  assert.equal(elements(app.render(), 'CheckoutAddressEditor').length, 1);
 });
 
 test('one transport selection sets both trips together and unavailable pickup options are hidden', () => {
@@ -484,4 +485,19 @@ test('a shop closing during the countdown prevents submission', async () => {
   await app.advance(5000);
   assert.equal(app.calls.length, 0);
   assert.match(app.error(), /shop is closed/);
+});
+
+
+test('checkout pin warning opens an inline editor and saving stays in checkout', () => {
+  const app = harness();
+  app.draft.shop = { ...app.draft.shop, latitude: 13.62, longitude: 123.19, deliveryMaxKm: 3 };
+  assert.ok(app.button('Edit address & map pin'));
+  app.button('Update address & map pin').props.onPress();
+  const editor = elements(app.render(), 'CheckoutAddressEditor')[0];
+  assert.ok(editor); assert.equal(editor.props.userId, 1);
+  assert.equal(app.navigation.length, 0);
+  editor.props.onSaved(); editor.props.onClose();
+  assert.equal(app.draft.address, null);
+  assert.equal(app.navigation.length, 0);
+  assert.ok(app.button('Edit address & map pin'));
 });

@@ -1,3 +1,5 @@
+import { RiderPerformanceController } from '../controllers/rider-performance.controller';
+import { HandoverPhotoController } from '../controllers/handover-photo.controller';
 import { Router } from 'express';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.middleware';
 import { DeliveryController as C } from '../controllers/delivery.controller';
@@ -6,7 +8,11 @@ import { RiderApplicationController as A } from '../controllers/rider-applicatio
 import { RiderTrackingController as T } from '../controllers/rider-tracking.controller';
 const router = Router();
 router.use(authenticateToken);
+router.get('/rider/performance', RiderPerformanceController.get);
+router.get('/orders/:id/handover-photos', HandoverPhotoController.list);
+router.get('/orders/:id/handover-photos/:photoId', HandoverPhotoController.image);
 router.get('/application', A.get);
+router.post('/application', (_req, res) => sendError(res, 'Customer accounts cannot apply as riders. Create a separate account using rider signup.', 'FORBIDDEN', 403));
 router.put('/application', A.save);
 router.post('/application/submit', A.submit);
 router.get('/applications/:id', requireAdmin, A.get);

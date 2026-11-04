@@ -12,7 +12,7 @@ export class AuthController {
   static async riderSignup(req: Request, res: Response, next: NextFunction) {
     try {
       const { confirmPassword, password, ...data } = riderSignupSchema.parse(req).body;
-      if (await prisma.user.findUnique({ where: { email: data.email } })) return sendError(res, 'This email is already registered. Sign in with your existing account or use a different email for your rider application.', 'CONFLICT', 409);
+      if (await prisma.user.findUnique({ where: { email: data.email } })) return sendError(res, 'This email is already registered. Rider and customer accounts must use different email addresses.', 'CONFLICT', 409);
       const hash = await bcrypt.hash(password, 10);
       const user = await prisma.$transaction(async tx => {
         const result = await tx.user.create({ data: {

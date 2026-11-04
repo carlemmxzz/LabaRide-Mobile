@@ -47,14 +47,15 @@ async function request(path, method = 'GET', body, who = 1) {
 }
 const reading = (overrides = {}) => ({ sharing: true, sessionId: 'session_test_1', latitude: 0, longitude: 0, accuracy: 12, capturedAt: Date.now(), ...overrides });
 
-test('only the assigned rider publishes and only the customer/admin can read the live point', async () => {
+test('only the assigned rider publishes and only involved customer/shop/admin/assigned rider can read the live point', async () => {
   for (const [who, status] of [[null, 401], [1, 403], [2, 403], [3, 403]]) assert.equal((await request('/delivery/location', 'PUT', reading(), who)).status, status);
   assert.equal((await request('/delivery/location', 'PUT', reading(), 8)).body.data.sharedJobs, 0);
   assert.equal((await request('/delivery/location', 'PUT', reading(), 7)).body.data.sharedJobs, 1);
   const tracking = await request('/delivery/orders/47/tracking');
   assert.equal(tracking.status, 200); assert.equal(tracking.headers.get('cache-control'), 'private, no-store');
   assert.equal(tracking.body.data.state, 'sharing'); assert.equal(tracking.body.data.location.latitude, 0); assert.equal(tracking.body.data.location.accuracy, 12);
-  for (const who of [2, 7, 8, 9]) assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, who)).status, 403);
+  for (const who of [2, 7]) assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, who)).status, 200);
+  for (const who of [8, 9]) assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, who)).status, 403);
   assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 3)).status, 200);
   assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, null)).status, 401);
 });
@@ -113,4 +114,16 @@ test('pickup tracking and assigned job directions use the collection address, re
   order.workflowStatus = 'OutForDelivery'; jobs[0].stage = 'Delivery';
   response = await request('/delivery/orders/47/tracking');
   assert.deepEqual(response.body.data.customer, { latitude: 0, longitude: 0 });
+});
+
+
+test('completed or reassigned riders cannot read another rider location on the order', async () => {
+  jobs[0].riderId = 8;
+  await request('/delivery/location', 'PUT', reading({ latitude: 1 }), 8);
+  assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 7)).status, 403);
+  assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 8)).status, 200);
+  assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 2)).body.data.location.latitude, 1);
+  jobs[0].status = 'Completed';
+  assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 8)).status, 403);
+  assert.equal((await request('/delivery/orders/47/tracking', 'GET', undefined, 2)).body.data.location, null);
 });

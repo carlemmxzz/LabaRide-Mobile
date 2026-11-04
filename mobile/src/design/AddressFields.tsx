@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import * as Location from "expo-location";
 import { View } from "react-native";
 import { Button, Choice, Field, Section, Txt, usePalette, styles } from "./ui";
@@ -25,22 +25,40 @@ export function FormError({ error }: { error?: string | null }) {
     <Txt style={{ color: palette.danger }}>{error}</Txt>
   </View>;
 }
-export function AddressFields({ values, setValues }: {
+export function AddressFields({ values, setValues, requirePin = false }: {
   values: Record<string, string>;
   setValues: Dispatch<SetStateAction<Record<string, string>>>;
+  requirePin?: boolean;
 }) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const point = coordinates(values);
+  const locationRequest = useRef(0);
+  useEffect(() => () => { ++locationRequest.current; }, []);
+  function changeAddress(key: string, text: string) {
+    const changesLocation = key !== 'address_line_2' && text.trim().toLowerCase() !== (values[key] || '').trim().toLowerCase();
+    if (changesLocation) {
+      ++locationRequest.current; setLocating(false);
+      if (point) setLocationError('Your address changed. Move the pin to the new address before saving. If you only corrected the text, confirm that the existing pin still matches.');
+    }
+    setValues(current => ({ ...current, [key]: text,
+      ...(changesLocation && point ? { pinNeedsConfirmation: 'true' } : {}),
+    }));
+  }
 
   async function handlePin(coordinate: { latitude: number; longitude: number }) {
+    const request = ++locationRequest.current;
+    setLocationError(null);
+    setLocating(false);
     setValues(current => ({
       ...current,
       latitude: String(coordinate.latitude),
       longitude: String(coordinate.longitude),
+      pinNeedsConfirmation: 'false',
     }));
     try {
       const geo = await reverseGeocodeCoordinates(coordinate.latitude, coordinate.longitude);
+      if (request !== locationRequest.current) return;
       setValues(current => ({
         ...current,
         latitude: String(coordinate.latitude),
@@ -57,18 +75,26 @@ export function AddressFields({ values, setValues }: {
   }
 
   async function locate() {
+    const request = ++locationRequest.current;
     setLocating(true);
     setLocationError(null);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
+      if (request !== locationRequest.current) return;
       if (permission.status !== "granted") {
         setLocationError("Location access is off. You can still enter your address manually.");
         return;
       }
-      const result = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const result = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (request !== locationRequest.current) return;
       const lat = result.coords.latitude;
       const lng = result.coords.longitude;
-      const geo = await reverseGeocodeCoordinates(lat, lng);
+      // A working GPS fix must not depend on address lookup/network success.
+      setValues(current => ({ ...current, latitude: String(lat), longitude: String(lng), pinNeedsConfirmation: 'false' }));
+      let geo: Awaited<ReturnType<typeof reverseGeocodeCoordinates>>;
+      try { geo = await reverseGeocodeCoordinates(lat, lng); }
+      catch { return; }
+      if (request !== locationRequest.current) return;
       setValues(current => ({
         ...current,
         latitude: String(lat),
@@ -80,9 +106,9 @@ export function AddressFields({ values, setValues }: {
         ...(geo.country ? { country: geo.country } : {}),
       }));
     } catch {
-      setLocationError("Could not find your location. Please try again or enter your address manually.");
+      if (request === locationRequest.current) setLocationError("Could not find your location. Place the map pin at your address or try again.");
     } finally {
-      setLocating(false);
+      if (request === locationRequest.current) setLocating(false);
     }
   }
   return <View>
@@ -95,10 +121,16 @@ export function AddressFields({ values, setValues }: {
       ["postal_code", "ZIP / Postal code *", "ZIP or postal code"],
       ["country", "Country *", "Country"],
     ].map(([key, label, placeholder]) => <Field key={key} label={label} placeholder={placeholder}
-      value={values[key] || ""} onChangeText={text => setValues(current => ({ ...current, [key]: text }))} />)}
-    <Section title="Map location (optional)" />
-    <Txt style={[styles.muted, { marginBottom: 12 }]}>If you are at this address, save your current position to help locate nearby shops. Check that it matches the address above.</Txt>
+      value={values[key] || ""} onChangeText={text => changeAddress(key, text)} />)}
+    <Section title={requirePin ? 'Map location *' : 'Map location (optional)'} />
+    <Txt style={[styles.muted, { marginBottom: 12 }]}>{requirePin ? 'Place the pin at this address so we can check pickup and delivery distances. If you are there now, you can use your current position.' : 'If you are at this address, save your current position to help locate nearby shops. Check that it matches the address above.'}</Txt>
     <Button title={point ? "Update current position" : "Use current position"} outline busy={locating} onPress={locate} />
+    <Txt style={[styles.muted, { marginTop: 8 }]}>Current position uses your device's GPS. For an address somewhere else, tap that location on the map instead.</Txt>
+    {point && values.pinNeedsConfirmation === 'true' && <Button title="Confirm existing pin matches this address" outline onPress={() => {
+      setValues(current => ({ ...current, pinNeedsConfirmation: 'false' }));
+      setLocationError(null);
+    }} />}
+    {!!point && <Txt style={[styles.muted, { marginTop: 10 }]}>Map pin: {point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}. Check that this is the delivery address before saving.</Txt>}
     <FormError error={locationError} />
     <View style={{ height: 240, marginVertical: 16, borderRadius: 12, overflow: "hidden" }}>
       <LaundryMap latitude={point?.latitude ?? 13.6217} longitude={point?.longitude ?? 123.1948} onPin={handlePin} />

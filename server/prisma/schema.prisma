@@ -50,6 +50,7 @@ model User {
   riderProfile RiderProfile?
   deliveryAssignments DeliveryAssignment[]
   orderEvents OrderEvent[]
+  handoverPhotos RiderHandoverPhoto[]
   weightEvidence OrderWeightEvidence[]
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -238,6 +239,7 @@ model Transaction {
   deliveryCode    String? @map("delivery_code")
   assignments     DeliveryAssignment[]
   events          OrderEvent[]
+  handoverPhotos  RiderHandoverPhoto[]
   weightEvidence  OrderWeightEvidence[]
   createdAt       DateTime          @default(now()) @map("created_at")
 
@@ -340,6 +342,9 @@ model DeliveryAssignment {
   resumeStatus String? @map("resume_status")
   status String @default("Offered")
   expiresAt DateTime @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  completedAt DateTime? @map("completed_at")
+  handoverPhotos RiderHandoverPhoto[]
   liveLatitude Float? @map("live_latitude")
   liveLongitude Float? @map("live_longitude")
   liveAccuracy Float? @map("live_accuracy")
@@ -402,4 +407,22 @@ model ClothingType {
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@map("clothing_types")
+}
+
+model RiderHandoverPhoto {
+  id Int @id @default(autoincrement())
+  transactionId Int @map("transaction_id")
+  assignmentId Int @map("assignment_id")
+  riderId Int @map("rider_id")
+  kind String
+  note String @default("")
+  workflowStatus String @map("workflow_status")
+  bytes Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  assignment DeliveryAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  rider User @relation(fields: [riderId], references: [id])
+  @@index([transactionId, createdAt])
+  @@index([assignmentId, kind])
+  @@map("rider_handover_photos")
 }

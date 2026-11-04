@@ -31,7 +31,7 @@ export function RiderLocationSharingProvider({ children }: { children: React.Rea
     starting.current = true; setBusy(true); setError('');
     try {
       if (Platform.OS === 'web' && !window.isSecureContext) throw new Error('Browser location sharing needs HTTPS or localhost. Use the mobile app when testing over an HTTP Wi-Fi address.');
-      if ((await Location.requestForegroundPermissionsAsync()).status !== 'granted') throw new Error('Allow location access to share your position with customers. You can enable it in your device or browser settings.');
+      if ((await Location.requestForegroundPermissionsAsync()).status !== 'granted') throw new Error('Allow location access to share your position with the customer and laundry shop. You can enable it in your device or browser settings.');
       setEnabled(true);
     } catch (failure) { setError(message(failure)); }
     finally { starting.current = false; setBusy(false); }
@@ -89,8 +89,8 @@ export function RiderLocationSharingControl() {
   const sharing = useContext(SharingContext);
   const palette = usePalette();
   if (!sharing) return null;
-  return <Card><View style={styles.between}><View style={{ flex: 1, minWidth: 160, gap: 6 }}><Txt style={{ fontWeight: '700', color: palette.primary }}>Customer location tracking</Txt><Txt style={styles.muted}>{!sharing.enabled ? 'Location sharing is off.' : sharing.paused ? 'Location sharing is paused.' : sharing.error ? 'Location updates need attention.' : sharing.lastSent ? 'Sharing your position with active-job customers.' : 'Getting your first GPS position…'}</Txt></View><Button title={sharing.enabled ? 'Stop sharing location' : 'Start sharing location'} compact outline busy={sharing.busy} disabled={!sharing.enabled && !sharing.activeJobs} onPress={() => { if (sharing.enabled) sharing.stop(); else void sharing.start(); }} /></View>
-    <Txt style={{ fontSize: 12, lineHeight: 20, color: palette.muted }}>Shares with customers for your {sharing.activeJobs} active {sharing.activeJobs === 1 ? 'job' : 'jobs'}. Keep LabaRide open in the foreground. Switching to another app or locking the phone pauses updates. Sharing ends when your jobs finish.</Txt>
+  return <Card><View style={styles.between}><View style={{ flex: 1, minWidth: 160, gap: 6 }}><Txt style={{ fontWeight: '700', color: palette.primary }}>Live location sharing</Txt><Txt style={styles.muted}>{!sharing.enabled ? 'Location sharing is off.' : sharing.paused ? 'Location sharing is paused.' : sharing.error ? 'Location updates need attention.' : sharing.lastSent ? 'Sharing your position with active-job customers and shops.' : 'Getting your first GPS position…'}</Txt></View><Button title={sharing.enabled ? 'Stop sharing location' : 'Start sharing location'} compact outline busy={sharing.busy} disabled={!sharing.enabled && !sharing.activeJobs} onPress={() => { if (sharing.enabled) sharing.stop(); else void sharing.start(); }} /></View>
+    <Txt style={{ fontSize: 12, lineHeight: 20, color: palette.muted }}>Shares with the customer and laundry shop for your {sharing.activeJobs} active {sharing.activeJobs === 1 ? 'job' : 'jobs'}. Keep LabaRide open in the foreground. Switching to another app or locking the phone pauses updates. Sharing ends when your jobs finish.</Txt>
     {!!sharing.lastSent && sharing.enabled && <Txt style={{ fontSize: 12, color: palette.muted }}>Last sent {new Date(sharing.lastSent).toLocaleTimeString()}</Txt>}
     {!!sharing.error && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{sharing.error}</Txt>}
   </Card>;

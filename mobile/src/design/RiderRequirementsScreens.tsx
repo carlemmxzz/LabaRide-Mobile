@@ -16,8 +16,8 @@ export const riderDocumentLabels: Record<string, string> = {
 };
 type Document = { id: number; type: string; status: string; reviewReason?: string; updatedAt: string };
 type Application = { userId: number; applicationStatus: string; registeredOwner: boolean; licenseNumber?: string; licenseExpiry?: string; motorcycleMake?: string; motorcycleModel?: string; motorcycleYear?: number; plateNumber?: string; documents: Document[]; missing: string[]; user: { name: string; email: string; phone: string; birthdate?: string; address_line_1?: string; city?: string; state_province?: string; postal_code?: string } };
-const fields = { birthdate: '', address_line_1: '', city: '', state_province: '', postal_code: '', licenseNumber: '', licenseExpiry: '', motorcycleMake: '', motorcycleModel: '', motorcycleYear: '', plateNumber: '' };
-const labels: Record<keyof typeof fields, string> = { birthdate: 'Birthdate (18 or older)', address_line_1: 'Street / barangay / house number', city: 'City or municipality', state_province: 'Province', postal_code: 'Postal code', licenseNumber: 'Professional license number', licenseExpiry: 'License expiry date', motorcycleMake: 'Motorcycle brand', motorcycleModel: 'Motorcycle model', motorcycleYear: 'Year model', plateNumber: 'Plate / registration' };
+const fields = { name: '', phone: '', birthdate: '', address_line_1: '', city: '', state_province: '', postal_code: '', licenseNumber: '', licenseExpiry: '', motorcycleMake: '', motorcycleModel: '', motorcycleYear: '', plateNumber: '' };
+const labels: Record<keyof typeof fields, string> = { name: 'Full name', phone: 'Contact number', birthdate: 'Birthdate (18 or older)', address_line_1: 'Street / barangay / house number', city: 'City or municipality', state_province: 'Province', postal_code: 'Postal code', licenseNumber: 'Professional license number', licenseExpiry: 'License expiry date', motorcycleMake: 'Motorcycle brand', motorcycleModel: 'Motorcycle model', motorcycleYear: 'Year model', plateNumber: 'Plate / registration' };
 const documentHints: Record<string, string> = {
   ApplicantPhoto: 'Use a recent, front-facing photo with a plain background. Center your face; the photo is saved in a square 2×2 format.',
   ProfessionalLicense: 'Show your name, professional classification, photo, and expiry date clearly.',
@@ -57,9 +57,9 @@ function RiderReviewSummary({ application, values, owner, required, edit, disabl
       <View style={{ flex: wide ? 1 : undefined, minWidth: 0, borderWidth: 1, borderColor: palette.line, borderRadius: 16, padding: wide ? 20 : 16, gap: 18 }}>
         <View style={[styles.between, { alignItems: 'center', gap: 8 }]}><View style={[styles.row, { gap: 8 }]}><UserRound size={18} color={palette.primary} /><Txt style={{ fontWeight: '700' }}>Personal details</Txt></View><Button title="Edit personal details" compact outline disabled={disabled} onPress={() => edit(0)} /></View>
         {applicantPhoto && <PrivateRiderDocument userId={application.userId} type="ApplicantPhoto" version={applicantPhoto.updatedAt} initiallyOpen />}
-        {detail('Full name', application.user.name)}
+        {detail('Full name', values.name)}
         {detail('Email address', application.user.email)}
-        {detail('Contact number', application.user.phone)}
+        {detail('Contact number', values.phone)}
         {detail('Birthdate', date(values.birthdate))}
         {detail('Home address', [values.address_line_1, values.city, values.state_province, values.postal_code].filter(Boolean).join(', '))}
       </View>
@@ -129,7 +129,7 @@ export function RiderOnboardingDesign({ onSubmitted }: { onSubmitted: () => void
     if (busy) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const keys = step === 0 ? ['birthdate', 'address_line_1', 'city', 'state_province', 'postal_code'] : ['licenseNumber', 'licenseExpiry', 'motorcycleMake', 'motorcycleModel', 'motorcycleYear', 'plateNumber'];
+      const keys = step === 0 ? ['name', 'phone', 'birthdate', 'address_line_1', 'city', 'state_province', 'postal_code'] : ['licenseNumber', 'licenseExpiry', 'motorcycleMake', 'motorcycleModel', 'motorcycleYear', 'plateNumber'];
       if (next && keys.some(key => !values[key as keyof typeof fields].trim())) throw new Error('Complete all fields in this step before continuing.');
       const body: Record<string, unknown> = Object.fromEntries(keys.filter(key => next || values[key as keyof typeof fields].trim()).map(key => [key, key === 'motorcycleYear' ? Number(values.motorcycleYear) : values[key as keyof typeof fields].trim()]));
       if (step === 1) body.registeredOwner = owner;
@@ -159,7 +159,7 @@ export function RiderOnboardingDesign({ onSubmitted }: { onSubmitted: () => void
   function field(key: keyof typeof fields) {
     if (key === 'birthdate' || key === 'licenseExpiry') return <PickerField key={key} label={labels[key]} mode="date" value={values[key]} initialValue={key === 'licenseExpiry' ? new Date().toISOString().slice(0, 10) : '2000-01-01'} onChange={value => setValues(current => ({ ...current, [key]: value }))} maximumDate={key === 'birthdate' ? new Date(new Date().getFullYear() - 18, new Date().getMonth(), new Date().getDate()) : undefined} />;
     const placeholders: Partial<Record<keyof typeof fields, string>> = { address_line_1: 'House number, street and barangay', city: 'e.g. Naga', state_province: 'e.g. Camarines Sur', postal_code: 'e.g. 4400', licenseNumber: 'As shown on your professional license', motorcycleMake: 'e.g. Honda', motorcycleModel: 'e.g. Click 125', motorcycleYear: 'e.g. 2022', plateNumber: 'As shown on your OR/CR' };
-    return <Field key={key} label={labels[key]} placeholder={placeholders[key]} value={values[key]} onChangeText={value => setValues(current => ({ ...current, [key]: value }))} editable={!busy} appearance="soft" keyboardType={key === 'motorcycleYear' || key === 'postal_code' ? 'number-pad' : 'default'} />;
+    return <Field key={key} label={labels[key]} placeholder={placeholders[key]} value={values[key]} onChangeText={value => setValues(current => ({ ...current, [key]: value }))} editable={!busy} appearance="soft" keyboardType={key === 'phone' ? 'phone-pad' : key === 'motorcycleYear' || key === 'postal_code' ? 'number-pad' : 'default'} />;
   }
   function pair(first: keyof typeof fields, second: keyof typeof fields) {
     return <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 14 : 0 }}><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field(first)}</View><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field(second)}</View></View>;
@@ -176,7 +176,7 @@ export function RiderOnboardingDesign({ onSubmitted }: { onSubmitted: () => void
         <View style={{ flexDirection: wide ? 'row' : 'column', alignItems: 'flex-start', gap: 16 }}>
           <View style={{ flex: wide ? 1 : undefined, width: wide ? undefined : '100%', minWidth: 0 }}><RiderFormSection title="Account & eligibility" description="Your registered contact details" icon={UserRound}>
             <View style={{ padding: 14, borderRadius: 12, backgroundColor: palette.surface, gap: 8 }}><Txt style={{ fontWeight: '600' }}>{application.user.name}</Txt><Txt selectable style={{ color: palette.muted, fontSize: 13 }}>{application.user.email}</Txt><Txt selectable style={{ color: palette.muted, fontSize: 13 }}>{application.user.phone}</Txt></View>
-            {field('birthdate')}<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}><ShieldCheck size={17} color={palette.primary} style={{ flexShrink: 0, marginTop: 2 }} /><Txt style={{ flex: 1, fontSize: 12, color: palette.muted, lineHeight: 20 }}>You must be 18 or older to apply as a rider.</Txt></View>
+            {field('name')}{field('phone')}{field('birthdate')}<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}><ShieldCheck size={17} color={palette.primary} style={{ flexShrink: 0, marginTop: 2 }} /><Txt style={{ flex: 1, fontSize: 12, color: palette.muted, lineHeight: 20 }}>You must be 18 or older to apply as a rider.</Txt></View>
           </RiderFormSection></View>
           <View style={{ flex: wide ? 1.25 : undefined, width: wide ? undefined : '100%', minWidth: 0 }}><RiderFormSection title="Home address" description="Enter your complete current address." icon={MapPin}>{field('address_line_1')}{field('city')}{pair('state_province', 'postal_code')}</RiderFormSection></View>
         </View>

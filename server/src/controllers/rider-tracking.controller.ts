@@ -38,11 +38,13 @@ export class RiderTrackingController {
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
       const order = await prisma.transaction.findUnique({ where: { id }, select: { userId: true, workflowStatus: true, collectionMethod: true, collectionAddress: true, latitude: true, longitude: true,
-        shop: { select: { latitude: true, longitude: true } },
-        assignments: { where: { status: 'Accepted' }, select: { stage: true, locationSharing: true, liveLatitude: true, liveLongitude: true, liveAccuracy: true, locationCapturedAt: true, locationReceivedAt: true, rider: { select: { name: true } } } },
+        shop: { select: { userId: true, latitude: true, longitude: true } },
+        assignments: { where: { status: 'Accepted' }, select: { riderId: true, stage: true, locationSharing: true, liveLatitude: true, liveLongitude: true, liveAccuracy: true, locationCapturedAt: true, locationReceivedAt: true, rider: { select: { name: true } } } },
       } });
       if (!order) fail('Order not found', 404);
-      if (order.userId !== req.user!.userId && !req.user!.isAdmin) fail('Rider location access denied', 403);
+      const viewer = req.user!;
+      const assignedRider = viewer.isRider && order.assignments.some(job => job.riderId === viewer.userId);
+      if (order.userId !== viewer.userId && order.shop.userId !== viewer.userId && !viewer.isAdmin && !assignedRider) fail('Rider location access denied', 403);
       res.setHeader('Cache-Control', 'private, no-store');
       const active = trackingStages.includes(order.workflowStatus || '');
       const job = active ? order.assignments.find(job => job.stage === (order.workflowStatus?.startsWith('Pickup') || order.workflowStatus === 'LaundryPickedUp' ? 'Pickup' : 'Delivery')) : undefined;

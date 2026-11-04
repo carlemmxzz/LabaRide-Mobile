@@ -47,6 +47,7 @@ import {
 } from "./data";
 import { addressError, addressPayload } from "./address";
 import { DeliveryDetails, FormError } from "./AddressFields";
+import { CheckoutAddressEditor } from "./CheckoutAddressEditor";
 import { message } from "./data";
 import { useLaundryDraft } from "./store";
 import { orderPricing } from "./order-pricing";
@@ -114,7 +115,8 @@ export function CheckoutDesign() {
     setCountdown(null);
   }, []);
   useFocusEffect(useCallback(() => cancelCountdown, [cancelCountdown]));
-  const [dialog, setDialog] = useState<"address" | "schedule" | null>(null);
+  const [dialog, setDialog] = useState<"address" | "edit-address" | "schedule" | null>(null);
+  const [addressSaving, setAddressSaving] = useState(false);
   const [transportOpen, setTransportOpen] = useState(false);
   const cache = useQueryClient();
   const customerAddress = draft.address || profile.data;
@@ -137,6 +139,10 @@ export function CheckoutDesign() {
       return raw ? JSON.parse(raw) as Partial<Profile>[] : [];
     },
   });
+  function editAddress() {
+    if (!user) { router.push('/(auth)/login'); return; }
+    cancelCountdown(); setDialog('edit-address');
+  }
   function chooseAddress() {
     setDialog("address");
   }
@@ -273,9 +279,10 @@ export function CheckoutDesign() {
           <Txt style={styles.muted}>{address(draft.shop)}</Txt>
           <PriceRow label="Customer" value={profile.data?.name || user?.name || "Log in to place your order"} />
           {!!user && <View style={{ gap: 4, marginBottom: 8 }}>
-            <MenuRow title="Customer address" detail={address(customerAddress) || "No address saved. Add one in Profile."}
+            <MenuRow title="Customer address" detail={address(customerAddress) || "No address saved. Add your address here."}
               asset="locationblue.png" onPress={chooseAddress} />
-            {!!addressError(customerAddress) && <FormError error="Complete your address in Profile before checkout." />}
+            <Button title="Edit address & map pin" outline onPress={editAddress} />
+            {!!addressError(customerAddress) && <FormError error="Tap Edit address & map pin to complete your address." />}
             {(draft.deliveryType === "Deliver" || draft.collectionMethod === "ShopPickup") && customerAddress && <DeliveryDetails value={customerAddress} />}
           </View>}
           <PriceRow label="Contact Number" value={profile.data?.phone || "Not provided"} />
@@ -330,8 +337,8 @@ export function CheckoutDesign() {
             {areaError && <View accessibilityRole="alert" accessibilityLiveRegion="polite"
               style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#FECDD3", backgroundColor: "#FFF1F2", gap: 10 }}>
               <Txt style={{ color: palette.danger, fontWeight: "600" }}>Address needs attention</Txt>
-              <Txt style={{ color: palette.danger }}>{areaError.startsWith("Pin your") ? "Update your saved address with a map pin in Profile so we can check the shop's service area." : areaError}</Txt>
-              {areaError.startsWith("Pin your") && <Button title="Manage addresses" color={palette.danger} outline onPress={manageAddresses} />}
+              <Txt style={{ color: palette.danger }}>{areaError.startsWith("Pin your") ? "Update your map pin here in checkout. Saving also updates your Profile address." : areaError}</Txt>
+              <Button title="Update address & map pin" color={palette.danger} outline onPress={editAddress} />
             </View>}
           </>}
         </Card>
@@ -384,16 +391,17 @@ export function CheckoutDesign() {
           <Totals />
         </Card>
       </View>
-      <Modal visible={!!dialog} transparent animationType="none" onRequestClose={() => setDialog(null)}>
+      <Modal visible={!!dialog} transparent animationType="none" onRequestClose={() => { if (!addressSaving) setDialog(null); }}>
         {dialog && <View style={{ flex: 1, backgroundColor: "#00000070", justifyContent: "center", alignItems: "center", padding: 20 }}>
-          {dialog === "schedule" ? <ScheduleDesign embedded inDialog pickup onDone={() => setDialog(null)} onClose={() => setDialog(null)} /> : <Card style={{ width: "100%", maxWidth: 540, maxHeight: "90%", padding: 24 }}>
+          {dialog === 'edit-address' ? <CheckoutAddressEditor userId={user!.id} value={customerAddress} selected={draft.address}
+            onSaved={() => { draft.set({ address: null }); setError(null); }} onClose={() => setDialog(null)} onBusyChange={setAddressSaving} /> : dialog === "schedule" ? <ScheduleDesign embedded inDialog pickup onDone={() => setDialog(null)} onClose={() => setDialog(null)} /> : <Card style={{ width: "100%", maxWidth: 540, maxHeight: "90%", padding: 24 }}>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 16 }}>
               <View style={[styles.between, { flexWrap: "wrap" }]}>
                 <Txt style={styles.heading}>Choose your address</Txt>
                 <Button title="Close" compact outline color={palette.navy} onPress={() => setDialog(null)} />
               </View>
               <View>
-                <Txt style={styles.muted}>Choose an address you saved in your profile. Add or edit addresses in Profile before placing your order.</Txt>
+                <Txt style={styles.muted}>Choose a saved address, or edit the selected address and map pin here in checkout.</Txt>
                 <QueryState loading={savedAddresses.isLoading} error={savedAddresses.error} retry={() => savedAddresses.refetch()} />
                 <View accessibilityRole="radiogroup" accessibilityLabel="Saved addresses" style={{ gap: 10, marginVertical: 14 }}>
                   {addressOptions.map((option, index) => {
@@ -415,6 +423,7 @@ export function CheckoutDesign() {
                   })}
                 </View>
                 {!addressOptions.length && <Txt style={styles.muted}>No addresses saved yet. Add your address in Profile before checkout.</Txt>}
+                {!!user && <Button title="Edit selected address & map pin" outline onPress={editAddress} />}
                 {!!user && <Button title="Manage addresses in Profile" compact outline onPress={manageAddresses} />}
               </View>
             </ScrollView>

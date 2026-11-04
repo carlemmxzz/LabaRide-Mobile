@@ -35,6 +35,7 @@ import { QueryState } from "./UserScreens";
 import LaundryMap from "./LaundryMap";
 import { AddressFields, FormError } from "./AddressFields";
 import { addressValues, addressError, addressPayload } from "./address";
+import { saveDefaultAddress, sameSavedAddress } from "./default-address";
 import { message, notify } from "./data";
 import PickerField from "./PickerField";
 import { validBirthdate } from "./form-values";
@@ -311,7 +312,7 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
             ),
           )}
           {!account && <MenuRow title="Address" detail={address(profile.data) || "Add your address"} asset="locationblue.png"
-            onPress={() => { useLaundryDraft.getState().set({ address: null }); go("confirm-location"); }} />}
+            onPress={() => go("addresses")} />}
         </Card>
         {account ? (
           <ShopAccountCredibility />
@@ -676,6 +677,21 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
   const profile = useProfile();
   const user = useAuthStore((state) => state.user);
   const draft = useLaundryDraft();
+  const cache = useQueryClient();
+  const [defaultBusy, setDefaultBusy] = useState<number | null>(null);
+  const [defaultError, setDefaultError] = useState('');
+  const defaultLock = useRef(false);
+  async function makeDefault(item: Partial<Profile>, index: number) {
+    if (!user || defaultLock.current) return;
+    defaultLock.current = true; setDefaultBusy(index); setDefaultError('');
+    try {
+      const result = await saveDefaultAddress(user.id, item, profile.data);
+      cache.setQueryData(['user', user.id], result.profile);
+      cache.setQueryData(['saved-addresses', user.id], result.entries);
+      if (checkout || !draft.address || draft.address.id === user.id) draft.set({ address: null });
+    } catch (failure) { setDefaultError(message(failure)); }
+    finally { defaultLock.current = false; setDefaultBusy(null); }
+  }
   const saved = useQuery({
     queryKey: ["saved-addresses", user?.id],
     enabled: !!user,
@@ -705,6 +721,7 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
           retry={() => profile.refetch()}
         />
         <Section title="Default Address" />
+        <Txt style={styles.muted}>Used automatically for new orders. Select Set as default below to change it.</Txt>
         <MenuRow
           title={address(profile.data) || "No default address"}
           asset="locationblue.png"
@@ -715,7 +732,9 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
           }}
         />
         {!!saved.data?.length && <Section title="Saved Addresses" />}
+        <FormError error={defaultError} />
         {saved.data?.map((item, index) => (
+          <View key={index} style={{ gap: 8 }}>
           <MenuRow
             key={index}
             title={address(item)}
@@ -726,6 +745,11 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
               else go("confirm-location", { checkout: "false" });
             }}
           />
+          <Button title={sameSavedAddress(item, profile.data) ? 'Default address' : 'Set as default'}
+            disabled={defaultBusy !== null || sameSavedAddress(item, profile.data)} busy={defaultBusy === index}
+            onPress={() => makeDefault(item, index)} />
+          <Txt style={styles.muted}>Tap the address to {checkout ? 'use it for this order' : 'edit its details and map pin'}.</Txt>
+          </View>
         ))}
       </View>
     </Screen>
@@ -747,14 +771,21 @@ export function LocationDesign({ stage = "add-location", checkout = false }: { s
   useEffect(() => {
     if (!initialized.current && selected) { initialized.current = true; setValues(addressValues(selected)); }
   }, [selected]);
-  async function save() {
-    if (busy) return;
+  const defaultLock = useRef(false);
+  async function save(setAsDefault = false) {
+    if (busy || defaultLock.current) return;
     const validation = addressError(values);
     if (validation) { setError(validation); return; }
     const payload = addressPayload(values);
-    setBusy(true); setError(null);
+    defaultLock.current = true; setBusy(true); setError(null);
     try {
-      if (stage === "add-address" && user) {
+      if (setAsDefault && user) {
+        const result = await saveDefaultAddress(user.id, payload, profile.data);
+        cache.setQueryData(['user', user.id], result.profile);
+        cache.setQueryData(['saved-addresses', user.id], result.entries);
+        draft.set({ address: null });
+        router.dismissTo(flowHref(checkout ? 'checkout' : 'addresses'));
+      } else if (stage === "add-address" && user) {
         const key = "labaride-addresses:" + user.id;
         const raw = await AsyncStorage.getItem(key);
         const entries: Partial<Profile>[] = raw ? JSON.parse(raw) : [];
@@ -774,7 +805,7 @@ export function LocationDesign({ stage = "add-location", checkout = false }: { s
         router.dismissTo(inShop ? "/shop/profile" : "/(user)/profile");
       } else { draft.set({ address: payload }); router.dismissTo("/(user)/home"); }
     } catch (failure) { setError(message(failure)); }
-    finally { setBusy(false); }
+    finally { defaultLock.current = false; setBusy(false); }
   }
   if (stage === "add-location") return <Screen title="Current Location">
     <View style={styles.stack}>
@@ -785,9 +816,12 @@ export function LocationDesign({ stage = "add-location", checkout = false }: { s
       <Button title="Set delivery address" color={palette.navy} onPress={() => go("current-location", { checkout: String(checkout) })} />
     </View>
   </Screen>;
-  return <Screen title={stage === "add-address" ? "Add New Address" : "Confirm Location"} background={palette.surface}
-    footer={<View><FormError error={error} /><Button title={stage === "add-address" ? "Add" : "Confirm Address"}
-      color={palette.navy} busy={busy} onPress={save} /></View>}>
+  return <Screen title={stage === "add-address" ? "Add New Address" : "Edit Address & Map Pin"} background={palette.surface}
+    footer={<View style={{ gap: 8 }}><FormError error={error} />
+      <Button title={stage === 'add-address' ? 'Save address' : checkout ? 'Use for this order' : 'Set as default'}
+        color={palette.navy} busy={busy} onPress={() => save(stage !== 'add-address' && !checkout && !!user)} />
+      {!!user && (stage === 'add-address' || checkout) && <Button title="Set as default" outline disabled={busy} onPress={() => save(true)} />}
+    </View>}>
     <View style={styles.stack}>
       <QueryState loading={profile.isLoading} error={profile.error} retry={() => profile.refetch()} />
       <Card><Section title="Delivery Address" /><AddressFields values={values} setValues={setValues} /></Card>

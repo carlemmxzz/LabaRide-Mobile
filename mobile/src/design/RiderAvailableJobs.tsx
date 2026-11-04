@@ -80,11 +80,12 @@ export function RiderAvailableJobsDesign() {
     } catch (failure) { setError(message(failure)); await query.refetch(); }
     finally { pending.current = false; setBusy(false); setClaimingId(null); }
   }
-  return <Screen title="Dashboard" brandedHeader back={false} right={<View style={{ flexDirection: 'row', gap: 4 }}>
+  return <Screen title="Available Jobs" brandedHeader back={false} right={<View style={{ flexDirection: 'row', gap: 4 }}>
     <IconButton label="Refresh jobs" onPress={() => { if (!query.isFetching) void query.refetch(); }}>{query.isFetching ? <ActivityIndicator size="small" color={palette.primary} /> : <RefreshCw size={20} color={palette.primary} />}</IconButton>
     <IconButton label="Open rider tools" onPress={() => setPanel('tools')}><Menu size={21} color={palette.primary} /></IconButton>
   </View>}>
     <View style={{ gap: 14 }}>
+
       {query.isLoading && <ActivityIndicator accessibilityLabel="Loading dashboard" color={palette.primary} />}
       {!!query.error && <Empty title="Unable to load jobs" message={message(query.error)} action="Retry" onPress={() => { void query.refetch(); }} />}
       {board && <>

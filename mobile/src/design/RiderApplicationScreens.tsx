@@ -40,6 +40,7 @@ export function RiderSignupDesign() {
     } catch (failure) { setError(message(failure)); }
     finally { setBusy(false); }
   }
+  if (auth.user) return <Redirect href={auth.user.isAdmin ? "/admin" : auth.user.isRider ? "/rider" : auth.user.riderApplicationStatus ? "/rider-application" : "/(user)/home"} />;
   return <Screen title="Apply as a Rider" brandedHeader><View style={{ width: '100%', maxWidth: wide ? 1040 : 560, alignSelf: 'center', flexDirection: wide ? 'row' : 'column', alignItems: 'flex-start', gap: wide ? 32 : 20 }}>
     <View style={{ width: wide ? 320 : '100%', padding: wide ? 28 : 0, borderRadius: 24, backgroundColor: wide ? palette.soft : undefined, gap: wide ? 24 : 12 }}>
       <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: wide ? 'white' : palette.soft, alignItems: 'center', justifyContent: 'center' }}><Bike size={28} color={palette.primary} /></View>
@@ -51,7 +52,7 @@ export function RiderSignupDesign() {
       ].map(([title, detail], index) => <View key={title} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}><View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}><Txt style={{ color: palette.primary, fontWeight: '600', fontSize: 12 }}>{index + 1}</Txt></View><View style={{ flex: 1, gap: 3 }}><Txt style={{ fontWeight: '600' }}>{title}</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>{detail}</Txt></View></View>)}</View>}
     </View>
     <Card style={{ flex: wide ? 1 : undefined, width: wide ? undefined : '100%', padding: wide ? 28 : 20, borderRadius: 20, gap: 0 }}>
-      <View style={{ gap: 4, marginBottom: 22 }}><Txt accessibilityRole="header" style={styles.heading}>Create your rider account</Txt><Txt style={{ color: palette.muted, fontSize: 12 }}>All fields are required.</Txt></View>
+      <View style={{ gap: 4, marginBottom: 22 }}><Txt accessibilityRole="header" style={styles.heading}>Create your rider account</Txt><Txt style={{ color: palette.muted, fontSize: 12 }}>Create a separate rider account with an email that is not used by a customer account. All fields are required.</Txt></View>
       {field('name')}
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 16 : 0 }}><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field('email')}</View><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field('phone')}</View></View>
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 16 : 0 }}><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field('password')}</View><View style={{ flex: wide ? 1 : undefined, minWidth: 0 }}>{field('confirmPassword')}</View></View>
@@ -87,6 +88,7 @@ export function RiderApplicationDesign() {
     }
   }, [profile.data?.isRider, auth.token]);
   if (!auth.user) return <Redirect href="/(auth)/login" />;
+  if (!status && !auth.user.isRider && !profile.isLoading && !profile.error) return <Redirect href="/(user)/home" />;
   if (status === 'Draft' || editing) return <RiderOnboardingDesign onSubmitted={() => { setEditing(false); void profile.refetch(); }} />;
   const pending = status === 'Pending';
   return <Screen title="Rider application" brandedHeader back={false}><View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', gap: 20 }}>

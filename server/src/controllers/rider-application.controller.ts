@@ -37,8 +37,8 @@ export class RiderApplicationController {
       await prisma.$transaction(async tx => {
         const userId = req.user!.userId;
         editable(await lock(tx, userId));
-        const { birthdate, address_line_1, city, state_province, postal_code, licenseExpiry, ...vehicle } = data;
-        await tx.user.update({ where: { id: userId }, data: { birthdate: birthdate ? new Date(birthdate) : undefined, address_line_1, city, state_province, postal_code, country: 'Philippines' } });
+        const { name, phone, birthdate, address_line_1, city, state_province, postal_code, licenseExpiry, ...vehicle } = data;
+        await tx.user.update({ where: { id: userId }, data: { name, phone, birthdate: birthdate ? new Date(birthdate) : undefined, address_line_1, city, state_province, postal_code, country: 'Philippines' } });
         await tx.riderProfile.update({ where: { userId }, data: { ...vehicle, licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : undefined, requirementsVersion: 1, applicationStatus: 'Draft', reviewReason: null } });
         // A changed identity/vehicle must be checked against the documents again.
         await tx.riderDocument.updateMany({ where: { userId, status: 'Verified' }, data: { status: 'Pending', reviewedAt: null, reviewedById: null } });
