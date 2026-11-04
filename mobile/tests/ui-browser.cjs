@@ -1289,6 +1289,22 @@ async function clickText(text) {
     }
     await clickText('Add Range'); await waitFor(closed);
     assert.deepEqual(priceRangeWrites[0],{minKilo:4,maxKilo:9,pricePerKilo:25.5});
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/services',width,'Weight-based pricing',`services-catalog-${width}`);
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid=service-weight-pricing]").length'),1,'Weight pricing has one consolidated section');
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid^=service-card-]").length'),3);
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-card-1]")).backgroundColor'),'rgb(255, 255, 255)','Desktop services use neutral cards');
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-accent-3]")).backgroundColor'),'rgb(92, 55, 76)','The saved service color is retained as an accent');
+      assert.ok(await evaluate('document.querySelector("[data-testid=service-weight-pricing]").innerText.includes("4 kg – 9 kg")'),'Saved ranges remain visible');
+    }
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Edit]").click()');
+    await waitFor(editor); await checkFit(false);
+    await input('Price per kilogram','36'); await clickText('Save Changes'); await waitFor(closed);
+    assert.equal(serviceWrites.at(-1).body.price,36,'Desktop editing saves the same service payload');
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Delete]").click()');
+    await waitFor('!!document.querySelector("[data-testid=app-dialog]")');
+    await clickText('Cancel'); await waitFor('!document.querySelector("[data-testid=app-dialog]")');
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=service-card-3]")'),'Cancelling deletion preserves the service');
     await clickText('Add Service'); await waitFor(editor);
     await command('Emulation.setDeviceMetricsOverride',{width:390,height:360,deviceScaleFactor:1,mobile:false});
     await pause(100); await checkFit(false);

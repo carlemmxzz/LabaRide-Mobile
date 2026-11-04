@@ -23,6 +23,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { DesktopShopSettings, SettingsLink, SettingsSaveBar, SettingsSection, useDesktopShopSettings } from './DesktopShopSettings';
+import { ServiceCatalog } from './ServiceCatalog';
 import {
   Asset,
   IconButton,
@@ -769,6 +770,8 @@ export function ShopDetailsFormDesign() {
 }
 export function ServicesDesign() {
   const palette = usePalette();
+  const { width: servicesWidth } = useWindowDimensions();
+  const desktop = Platform.OS === 'web' && servicesWidth >= 1100;
   const insets = useSafeAreaInsets();
   const owned = useOwnedShop();
   const detail = useShop(owned.data?.id || 0);
@@ -888,12 +891,14 @@ export function ServicesDesign() {
     <Screen
       title="Services"
       back={false}
+      dark={desktop ? false : undefined}
+      maxWidth={desktop ? 1500 : 1200}
       right={
-        <Button title="Add Service" compact color="white" textColor={palette.primary} disabled={busy}
-          icon={<Plus size={18} color={palette.primary} />} onPress={() => open("service")} />
+        <Button title="Add Service" compact color={desktop ? palette.primary : 'white'} textColor={desktop ? 'white' : palette.primary} disabled={busy}
+          icon={<Plus size={18} color={desktop ? 'white' : palette.primary} />} onPress={() => open("service")} />
       }
     >
-      <View style={[styles.stack, { width: "100%", maxWidth: 1100, alignSelf: "center" }]}>
+      <View style={[styles.stack, { width: "100%", maxWidth: desktop ? 1500 : 1100, alignSelf: "center" }]}>
         <QueryState
           loading={owned.isLoading || detail.isLoading}
           error={owned.error || detail.error}
@@ -902,8 +907,9 @@ export function ServicesDesign() {
             detail.refetch();
           }}
         />
-        <Section title="YOUR SERVICES" />
         {!dialog && <FormError error={error} />}
+        {desktop ? <ServiceCatalog services={shop?.services || []} ranges={shop?.kiloPrices || []} busy={busy} ready={!owned.isLoading && !detail.isLoading && !owned.error && !detail.error} edit={service => open('service', service)} remove={removeService} add={() => open('service')} addRange={() => open('price')} /> : <>
+        <Section title="YOUR SERVICES" />
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {shop?.services?.map((service) => {
             const cardColors = serviceCardColors(service.color, palette.primary);
@@ -992,6 +998,7 @@ export function ServicesDesign() {
             style={{ alignSelf: "flex-start" }}
           />
         </Card>
+        </>}
       </View>
       <Modal visible={!!dialog} transparent animationType="none" onRequestClose={() => { if (!busy) setDialog(null); }}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
@@ -999,7 +1006,7 @@ export function ServicesDesign() {
             flex: 1, backgroundColor: "#00000070", alignItems: "center", justifyContent: "center",
             paddingHorizontal: 14, paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16),
           }}>
-            <Card testID="service-editor" style={{ width: "100%", maxWidth: 440, maxHeight: "100%", flexShrink: 1, padding: 18, gap: 12 }}>
+            <Card testID="service-editor" style={{ width: "100%", maxWidth: desktop ? 540 : 440, maxHeight: "100%", flexShrink: 1, padding: desktop ? 24 : 18, borderRadius: desktop ? 20 : 16, gap: 12 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <Txt accessibilityRole="header" style={styles.heading}>
                   {editing ? "Edit" : "Add"} {dialog === "service" ? "Service" : "Price Range"}
@@ -1010,6 +1017,7 @@ export function ServicesDesign() {
                   <X size={20} color={palette.primary} />
                 </Pressable>
               </View>
+              {desktop && <Txt style={{ fontSize: 12, lineHeight: 18, color: palette.muted }}>{dialog === 'service' ? 'Set the price, load capacity, processing times, and identifying color.' : 'Choose the weight interval and the rate charged per kilogram.'}</Txt>}
               <ScrollView testID="service-editor-body" style={{ flexShrink: 1, flexGrow: 0, minHeight: 0 }}
                 keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ gap: 12, paddingBottom: 2 }}>
