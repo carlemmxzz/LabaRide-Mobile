@@ -731,7 +731,7 @@ export function ShopDetailsFormDesign() {
       <View style={{ flexDirection: 'row', gap: 14 }}>{distanceFields.filter(field => !field.startsWith('pickup') || values.pickupEnabled === 'true').map(field => <View key={field} style={{ flex: 1, minWidth: 0 }}><Field compact label={`${field.startsWith('delivery') ? 'Delivery' : 'Collection'} ${field.includes('Min') ? 'minimum' : 'maximum'} distance (km)`} keyboardType="decimal-pad" suffix="km" placeholder={field.includes('Min') ? '0' : 'No limit'} value={values[field] || ''} onChangeText={value => setValues(current => ({ ...current, [field]: value }))} /></View>)}</View>
     </SettingsSection>
     <SettingsSection title="Shop address" description="Set the physical address and map pin for your laundry shop."><AddressFields columns={2} values={values} setValues={setValues} /></SettingsSection>
-    <SettingsSaveBar onSave={save} busy={busy}>{!!savedMessage && <Txt accessibilityLiveRegion="polite" style={{ color: palette.primary }}>{savedMessage}</Txt>}<FormError error={error} /></SettingsSaveBar>
+    <SettingsSaveBar onSave={save} busy={busy}><FormError error={error} /></SettingsSaveBar>
   </DesktopShopSettings>;
   return <Screen title="Shop Details" background={palette.surface} footer={<View>
     <FormError error={error} /><Button title="Save Changes" color={palette.navy} busy={busy} onPress={save} />

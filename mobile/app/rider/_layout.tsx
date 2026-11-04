@@ -9,6 +9,7 @@ import { QueryState } from '../../src/design/UserScreens';
 import { useLogout } from '../../src/design/useLogout';
 import { useAuthStore } from '../../src/store/authStore';
 import { RiderLocationSharingProvider } from '../../src/design/RiderLocationSharing';
+import { workspaceSidebar } from '../../src/navigation/WorkspaceSidebar';
 
 export default function RiderTabs() {
   const profile = useProfile();
@@ -25,6 +26,7 @@ export default function RiderTabs() {
     tabBarLabelStyle: { fontFamily: 'Inter-Medium', fontSize: 12 }, tabBarItemStyle: { borderRadius: 12, marginHorizontal: desktop ? 8 : 2, marginVertical: desktop ? 4 : 0 },
     tabBarBackground: desktop ? () => <View pointerEvents="none" style={{ position: 'absolute', top: 24, left: 20 }}><Brand /><Txt style={{ color: palette.muted, marginTop: 8 }}>Rider workspace</Txt></View> : undefined,
     tabBarStyle: { width: desktop ? 224 : undefined, minWidth: desktop ? 224 : undefined, maxWidth: desktop ? 224 : undefined, backgroundColor: 'white', borderColor: palette.line, height: desktop ? undefined : 68 + insets.bottom, paddingTop: desktop ? 116 : 8, paddingBottom: Math.max(insets.bottom, 8) },
+    ...(desktop ? workspaceSidebar(palette, insets.bottom, 'Rider workspace') : {}),
   }}>
     <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={24} /> }} />
     <Tabs.Screen name="jobs" options={{ title: 'My jobs', tabBarIcon: ({ color }) => <Bike color={color} size={24} /> }} />

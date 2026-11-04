@@ -1,4 +1,5 @@
 import { toast } from "./toast-service";
+import { BrandMark } from './BrandMark';
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -203,7 +204,7 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
               <View style={{ flex: 1, minWidth: 0, padding: wide ? 42 : 24 }}>
               <View accessible accessibilityLabel="LabaRide ? Laundry pickup and delivery" style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 8 }}>
                 <View style={{ width: 76, height: 76, borderRadius: 20, backgroundColor: palette.soft, borderWidth: 1, borderColor: palette.line, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Asset name="blacklogo.png" size={64} />
+                  <BrandMark size={64} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ color: palette.primary, fontSize: wide ? 32 : 28, fontWeight: "700", letterSpacing: -0.8 }}>LabaRide</Txt>

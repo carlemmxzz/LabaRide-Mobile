@@ -46,6 +46,7 @@ import {
 import { useLaundryDraft } from "./store";
 import LaundryMap from "./LaundryMap";
 import { ShopPhoto } from "./ShopPhoto";
+import { ShopLocationCard } from './ShopLocationCard';
 import { RecentNotificationsModal } from "./RecentNotificationsModal";
 import { serviceAreaLabel } from "./service-area";
 import { shopAvailability } from "./shop-hours";
@@ -414,15 +415,9 @@ export function ShopInfoDesign({
               </View>
               <Txt>{shop.contactNumber || "Not provided"}</Txt>
             </Card>
-            <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0 }}>
-              <View style={styles.row}>
-                <MapPin color={palette.navy} size={22} />
-                <Txt style={styles.heading}>Address</Txt>
-              </View>
-              <Txt style={styles.muted}>{address(shop)}</Txt>
-            </Card>
           </View>
         )}
+        {tab === 'About' && <ShopLocationCard shop={shop} />}
         <Section title={tab === "Pricing" ? "Pricing" : "Services"} />
         <View style={{ flexDirection: desktop ? 'row' : 'column', flexWrap: 'wrap', gap: 16 }}>
         {(shop.services || []).map((service) => (
@@ -452,15 +447,8 @@ export function ShopMenuDesign({ id }: { id: number }) {
   const draft = useLaundryDraft();
   const shop = result.data;
   const availability = useShopAvailability(shop);
-  const [selected, setSelected] = useState<number[]>([]);
-  const chosen = (shop?.services || []).filter((s) => selected.includes(s.id));
-  const service = chosen.length
-    ? {
-        ...chosen[0],
-        serviceName: chosen.map((s) => s.serviceName).join(", "),
-        price: chosen.reduce((sum, s) => sum + Number(s.price), 0),
-      }
-    : undefined;
+  const [selected, setSelected] = useState<number | null>(() => draft.shop?.id === id ? draft.service?.id ?? null : null);
+  const service = shop?.services?.find(item => item.id === selected);
   return (
     <Screen
       background={palette.surface}
@@ -471,7 +459,7 @@ export function ShopMenuDesign({ id }: { id: number }) {
             <Txt style={styles.muted}>{service ? "Laundry rate" : "Basket"}</Txt>
             <Txt style={styles.heading}>
               {service
-                ? chosen.length === 1 && chosen[0].packageKilos != null ? `${money(chosen[0].price)}/load` : chosen.some((item) => item.packageKilos != null) || shop?.kiloPrices?.length ? "Based on weight" : `${money(service.price)}/kg`
+                ? service.packageKilos != null ? `${money(service.price)}/load` : shop?.kiloPrices?.length ? "Based on weight" : `${money(service.price)}/kg`
                 : money(0)}
             </Txt>
           </View>
@@ -482,7 +470,7 @@ export function ShopMenuDesign({ id }: { id: number }) {
             disabled={!service || !availability.isOpen}
             onPress={() => {
               if (shop && service && shopAvailability(shop).isOpen) {
-                draft.start(shop, service, chosen.map((selectedService) => selectedService.id));
+                draft.start(shop, service, [service.id]);
                 if (inShop) openFlow("order-summary", { id: String(id) });
                 else router.push({
                   pathname: "/(user)/order/confirm",
@@ -499,27 +487,6 @@ export function ShopMenuDesign({ id }: { id: number }) {
         <View style={styles.between}>
           <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()}>
             <Asset name="circlebackarrow.png" size={40} />
-          </Pressable>
-          <Pressable accessibilityRole="button"
-            onPress={() =>
-              draft.set({
-                deliveryType:
-                  draft.deliveryType === "Deliver" ? "Pickup" : "Deliver",
-              })
-            }
-            style={{
-              backgroundColor: "white",
-              borderWidth: 1,
-              borderColor: palette.navy,
-              borderRadius: 24,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-            }}
-          >
-            <View style={styles.row}>
-              <Txt style={{ color: palette.navy }}>{draft.deliveryType}</Txt>
-              <Asset name="downarrow.png" size={16} />
-            </View>
           </Pressable>
         </View>
         <QueryState
@@ -546,26 +513,23 @@ export function ShopMenuDesign({ id }: { id: number }) {
                 </View>
               </Card>
             </Pressable>
+            <View testID="shop-service-options" accessibilityRole="radiogroup" accessibilityLabel="Choose one laundry service" style={{ gap: 16 }}>
+            <Txt style={{ fontSize: 13, color: palette.muted }}>Choose one service for this order. Pickup and delivery options are available in the order summary.</Txt>
             {(shop.services || []).map((s) => {
 
               return (
-                <Pressable accessibilityRole="checkbox"
+                <Pressable accessibilityRole="radio"
                   key={s.id}
                   accessibilityLabel={`${s.serviceName}, ${servicePriceLabel(s)}`}
-                  accessibilityState={{ checked: selected.includes(s.id) }}
-                  onPress={() =>
-                    setSelected(
-                      selected.includes(s.id)
-                        ? selected.filter((id) => id !== s.id)
-                        : [...selected, s.id],
-                    )
-                  }
+                  accessibilityState={{ checked: selected === s.id }}
+                  aria-checked={selected === s.id}
+                  onPress={() => setSelected(s.id)}
                 >
                   <Card
                     style={{
-                      backgroundColor: selected.includes(s.id) ? palette.soft : "white",
+                      backgroundColor: selected === s.id ? palette.soft : "white",
                       borderWidth: 2,
-                      borderColor: selected.includes(s.id)
+                      borderColor: selected === s.id
                         ? palette.navy
                         : "transparent",
                       padding: 20,
@@ -585,17 +549,13 @@ export function ShopMenuDesign({ id }: { id: number }) {
                         style={{
                           width: 24,
                           height: 24,
-                          borderRadius: 4,
+                          borderRadius: 12,
                           borderWidth: 2,
                           borderColor: palette.navy,
-                          backgroundColor: selected.includes(s.id)
-                            ? palette.navy
-                            : "transparent",
+                          alignItems: 'center', justifyContent: 'center',
                         }}
                       >
-                        {selected.includes(s.id) && (
-                          <Check color="white" size={20} />
-                        )}
+                        {selected === s.id && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: palette.primary }} />}
                       </View>
                     </View>
                     <Txt style={{ color: palette.navy }}>
@@ -619,6 +579,7 @@ export function ShopMenuDesign({ id }: { id: number }) {
                 </Pressable>
               );
             })}
+            </View>
             {!!shop.kiloPrices?.length && (
               <Card>
                 <Txt style={styles.heading}>Weight prices</Txt>

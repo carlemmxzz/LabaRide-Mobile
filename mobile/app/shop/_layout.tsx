@@ -8,6 +8,8 @@ import { QueryState } from "../../src/design/UserScreens";
 import { useAuthStore } from "../../src/store/authStore";
 import { useOwnedShop } from "../../src/design/data";
 import { socketService } from "../../src/services/socket.service";
+import { workspaceSidebar } from '../../src/navigation/WorkspaceSidebar';
+import { ClipboardList, House, UserRound, WashingMachine } from 'lucide-react-native';
 export default function ShopTabs() {
   return <InterfaceTheme role="shop"><ShopTabsContent /></InterfaceTheme>;
 }
@@ -45,15 +47,15 @@ function ShopTabsContent() {
           height: desktop ? undefined : 68 + insets.bottom,
           paddingTop: desktop ? 116 : 8, paddingBottom: desktop ? 16 : Math.max(insets.bottom, 8),
         },
+        ...(desktop ? workspaceSidebar(palette, insets.bottom, 'Shop management') : {}),
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
           title: "Home",
-          href: "/shop/home",
           tabBarIcon: ({ color }) => (
-            <Asset name="OrderScreenIcon/Home.png" tint={color} />
+            desktop ? <House size={24} color={color} /> : <Asset name="OrderScreenIcon/Home.png" tint={color} />
           ),
         }}
       />
@@ -61,9 +63,8 @@ function ShopTabsContent() {
         name="transactions"
         options={{
           title: "Orders",
-          href: "/shop/transactions",
           tabBarIcon: ({ color }) => (
-            <Asset name="OrderScreenIcon/Orders.png" tint={color} />
+            desktop ? <ClipboardList size={24} color={color} /> : <Asset name="OrderScreenIcon/Orders.png" tint={color} />
           ),
         }}
       />
@@ -71,9 +72,8 @@ function ShopTabsContent() {
         name="services"
         options={{
           title: "Services",
-          href: "/shop/services",
           tabBarIcon: ({ color }) => (
-            <Asset name="OrderScreenIcon/Services.png" tint={color} />
+            desktop ? <WashingMachine size={24} color={color} /> : <Asset name="OrderScreenIcon/Services.png" tint={color} />
           ),
         }}
       />
@@ -87,9 +87,8 @@ function ShopTabsContent() {
         name="profile"
         options={{
           title: "Profile",
-          href: "/shop/profile",
           tabBarIcon: ({ color }) => (
-            <Asset name="OrderScreenIcon/Profile.png" tint={color} />
+            desktop ? <UserRound size={24} color={color} /> : <Asset name="OrderScreenIcon/Profile.png" tint={color} />
           ),
         }}
       />

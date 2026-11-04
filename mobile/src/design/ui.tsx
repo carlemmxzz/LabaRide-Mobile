@@ -10,10 +10,10 @@ import { flutterAssets } from "./assets";
 import { interfaceIcons } from "./icons";
 import { usePalette } from "./theme";
 import { useWebAccessibility } from "./web-accessibility";
+import { BrandMark } from './BrandMark';
 import type { Service } from "./data";
 export { usePalette } from "./theme";
 type AssetName = keyof typeof flutterAssets | keyof typeof interfaceIcons;
-const brandBlue = '#2457AD';
 
 export const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -45,8 +45,8 @@ export function Asset({ name, size = 24, style, tint }: { name: AssetName; size?
 export function Brand({ white = false, compact = false }: { white?: boolean; compact?: boolean }) {
   const palette = usePalette();
   return <View style={[styles.row, compact ? undefined : styles.center]}>
-    <Asset name={white ? "whitelogo.png" : "blacklogo.png"} size={40} />
-    {!compact && <Txt style={{ fontSize: 26, fontWeight: "700", color: white ? "white" : brandBlue }}>LabaRide</Txt>}
+    <BrandMark size={56} white={white} />
+    {!compact && <Txt testID="brand-wordmark" style={{ fontSize: 26, fontWeight: "700", color: white ? "white" : palette.primary }}>LabaRide</Txt>}
   </View>;
 }
 export function Button({ title, onPress, busy, disabled, color, textColor, outline = false, round = false, compact = false, icon, style, accessibilityLabel }: {
@@ -101,8 +101,8 @@ export function Header({ title, dark = false, back = true, right, branded = fals
       {back && <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.canGoBack() ? router.back() : router.replace(home)}
         style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><ArrowLeft size={22} color={dark ? "white" : palette.primary} /></Pressable>}
       {branded ? <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Asset name={dark ? 'whitelogo.png' : 'blacklogo.png'} size={36} style={{ flexShrink: 0 }} />
-        <View style={{ flex: 1, minWidth: 0, gap: 1 }}><Txt numberOfLines={1} style={{ fontSize: 20, lineHeight: 26, fontWeight: '700', color: dark ? 'white' : brandBlue }}>LabaRide</Txt><Txt accessibilityRole="header" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18, color: dark ? 'white' : palette.muted }}>{title}</Txt></View>
+        <BrandMark size={48} white={dark} />
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}><Txt testID="brand-wordmark" numberOfLines={1} style={{ fontSize: 20, lineHeight: 26, fontWeight: '700', color: dark ? 'white' : palette.primary }}>LabaRide</Txt><Txt accessibilityRole="header" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18, color: dark ? 'white' : palette.muted }}>{title}</Txt></View>
       </View> : <Txt accessibilityRole="header" style={{ flex: 1, fontSize: 22, fontWeight: "700", color: dark ? "white" : palette.ink }}>{title}</Txt>}{right}
     </View>
   </View>;
