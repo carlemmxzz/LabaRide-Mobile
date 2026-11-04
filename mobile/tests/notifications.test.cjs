@@ -12,6 +12,11 @@ const compiled = ts.transpileModule(component.getText(ast), { compilerOptions: {
   module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022,
 } }).outputText;
 
+const hooksSource = fs.readFileSync(require('node:path').join(__dirname, '../src/design/useNotificationToasts.ts'), 'utf8');
+const hooksAst = ts.createSourceFile('hooks.ts', hooksSource, ts.ScriptTarget.Latest, true);
+const selected = hooksAst.statements.filter(node => ts.isFunctionDeclaration(node) && node.name.text === 'useNotifications' ||
+  ts.isVariableStatement(node) && node.declarationList.declarations.some(d => ['notificationQueryKey', 'notificationScopeQuery'].includes(d.name.getText(hooksAst))));
+const hooksCompiled = ts.transpileModule(selected.map(node => node.getText(hooksAst)).join('\n'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 function harness(shopMode) {
   const items = [
     { id: 1, transactionId: 42, title: 'Order processing', message: 'We can wash today.', createdAt: new Date().toISOString(), readAt: null },
@@ -21,6 +26,7 @@ function harness(shopMode) {
   let query, cache;
   const context = {
     useRef: value => ({ current: value }), useState: value => [value, () => {}],
+    useIsFocused: () => true, useNotificationVisibility() {},
     exports: {}, React, styles: {}, usePalette: () => ({}),
     useAuthStore: select => select({ user: { id: 7 } }),
     useQuery: options => { query = options; return { data: items }; },
@@ -30,6 +36,7 @@ function harness(shopMode) {
     go: (...args) => navigation.push(args), fail: error => { throw error; },
   };
   for (const name of ['Pressable', 'View', 'Screen', 'Section', 'Txt', 'Empty', 'QueryState']) context[name] = name;
+  vm.runInNewContext(hooksCompiled, context); Object.assign(context, context.exports);
   vm.runInNewContext(compiled, context);
   const root = context.exports.NotificationsDesign({ shopMode });
   const buttons = [];
@@ -46,7 +53,7 @@ function harness(shopMode) {
 test('separate events for the same order remain visible and use authenticated polling', async () => {
   const app = harness(false);
   assert.equal(app.buttons.length, 2);
-  assert.equal(app.query.refetchInterval, 15000);
+  assert.equal(app.query.refetchInterval, false, 'the screen observes the root poller');
   await app.query.queryFn();
   assert.equal(app.requests[0], '/notifications?shopMode=false');
   await app.buttons[0].props.onPress();

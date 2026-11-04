@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View, useWindowDimensions } from "react-native";
 import { ArrowRight, Check, CheckCircle2, Clock3, LockKeyhole, MapPin, Phone, RefreshCw, ShoppingBag, Store, TriangleAlert, Truck, type LucideIcon } from "lucide-react-native";
@@ -168,6 +169,7 @@ export function AdminDashboardDesign() {
         <Button title="Open delivery operations" outline style={desktop ? { alignSelf: 'flex-start', marginTop: 8 } : { marginTop: 8 }} onPress={() => router.push('/admin/operations')} />
       </Card>
       </View>
+      <Card style={{ padding: desktop ? 28 : 20, gap: 12 }}><Txt style={styles.heading}>Customer accounts</Txt><Txt style={styles.muted}>Find customers and block or restore account access for policy violations.</Txt><Button title="Manage customers" outline style={desktop ? { alignSelf: 'flex-start' } : undefined} onPress={() => router.push('/admin/customers')} /></Card>
     </View>
   </Screen>;
 }
@@ -204,6 +206,10 @@ export function AdminShopApplicationsDesign() {
       await api.put(`/admin/shops/${decision.shop.id}/review`, {
         status: decision.status, expectedStatus: decision.shop.approvalStatus, expectedVersion: decision.shop.applicationVersion, reason: reason.trim(),
       });
+      const name = decision.shop.shopName;
+      if (decision.status === "Approved") toast.success({ title: decision.shop.approvalStatus === "Suspended" ? "Shop restored" : "Shop approved", message: decision.shop.approvalStatus === "Suspended" ? `${name} is active again.` : `${name} can now accept orders.` });
+      else if (decision.status === "Rejected") toast.warning({ title: "Shop rejected", message: `${name}'s application was declined.` });
+      else toast.warning({ title: "Shop suspended", message: `${name} can't take new orders.` });
       setDecision(null);
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["admin-shops"] }),

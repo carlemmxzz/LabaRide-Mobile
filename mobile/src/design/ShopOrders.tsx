@@ -1,7 +1,8 @@
+import { NotificationBell } from "./NotificationBell";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { Bell, CheckCircle2, ChevronRight, Clock, WashingMachine } from "lucide-react-native";
+import { CheckCircle2, ChevronRight, Clock, WashingMachine } from "lucide-react-native";
 import { useOrders, type Order } from "./data";
 import { Button, Card, Empty, IconButton, Screen, SearchBox, Txt, money, usePalette } from "./ui";
 import { StatusBadge } from "./OrderScreens";
@@ -107,7 +108,7 @@ export function ShopOrdersDesign() {
   function changeSection(value: OrderSection) { setSection(value); setFilter("All"); setPage(0); }
   function changeFilter(value: ShopOrderFilter) { setFilter(value); setPage(0); }
   return <Screen title="Orders" back={false} background={palette.surface}
-    right={<IconButton label="Notifications" onPress={() => router.push({ pathname: "/shop/transactions/[flow]", params: { flow: "shop-notifications" } })}><Bell size={22} color={palette.primary} /></IconButton>}>
+    right={<IconButton label="Notifications" onPress={() => router.push({ pathname: "/shop/transactions/[flow]", params: { flow: "shop-notifications" } })}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton>}>
     <View style={{ gap: 20 }}>
       <View><Txt style={{ fontSize: 22, fontWeight: "700" }}>Your laundry orders</Txt><Txt style={{ color: palette.muted }}>Manage customer orders, laundry progress and handovers.</Txt></View>
       <LiveOperationsButton />

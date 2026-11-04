@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -89,6 +90,7 @@ export function DeliverySchedule({ embedded = false, pickup = false, onDone, onC
       ? shopAvailability(shop, current).message : !selected ? "Choose an available delivery time." : validateDeliveryTime(selected, rules, current, 6);
     if (failure) { setError(pickup ? failure.replace(/delivery/gi, "pickup") : failure); setNow(current); return; }
     draft.set(pickup ? { requestedPickupAt: selected } : { schedule: selected });
+    if (pickup) toast.success({ title: "Pickup time set", message: `${new Date(selected).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })} (PHT).` });
     if (onDone) onDone(); else router.back();
   }
   const monthDate = new Date(month + "-01T12:00:00+08:00");

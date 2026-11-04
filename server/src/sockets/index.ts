@@ -16,8 +16,8 @@ export const setupSocketIO = (server: HttpServer) => {
     try {
       const decoded = jwt.verify(socket.handshake.auth?.token, env.JWT_SECRET) as jwt.JwtPayload;
       if (!Number.isSafeInteger(decoded.userId) || decoded.userId <= 0) return next(new Error('Authentication required'));
-      const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { id: true } });
-      if (!user) return next(new Error('Authentication required'));
+      const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { id: true, isBlocked: true } });
+      if (!user || user.isBlocked) return next(new Error('Authentication required'));
       socket.data.userId = user.id;
       next();
     } catch { next(new Error('Authentication required')); }

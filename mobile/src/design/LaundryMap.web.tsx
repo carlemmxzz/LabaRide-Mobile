@@ -42,6 +42,7 @@ export default function LaundryMap({
       }
 
       const map = L.map(container, { zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([latitude, longitude], 14);
+      map.attributionControl.setPrefix(false);
       activeMap = map;
       (container as any)._leaflet_map = map;
 

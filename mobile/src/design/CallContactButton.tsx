@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useRef, useState } from 'react';
 import { Linking, Modal, Platform, ScrollView, View } from 'react-native';
 import { Phone } from 'lucide-react-native';
@@ -41,7 +42,8 @@ export function CallContactButton({ name, phone }: { name?: string; phone: strin
         {!!error && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{error}</Txt>}
         {!!notice && <Txt accessibilityLiveRegion="polite" style={{ color: palette.primary }}>{notice}</Txt>}
         <Button title="Open phone app" busy={busy} disabled={!number} onPress={() => { void dial(); }} />
-        {Platform.OS === 'web' && <Button title="Copy number" outline onPress={async () => { setNotice(await copyPhone(number || phone) ? 'Phone number copied.' : 'Could not copy automatically. Select the number above and copy it manually.'); }} />}
+        {Platform.OS === 'web' && <Button title="Copy number" outline onPress={async () => { if (await copyPhone(number || phone)) { setVisible(false); toast.success({ title: 'Number copied', message: name ? `${name}'s number is on your clipboard.` : 'The number is on your clipboard.' }); }
+          else setNotice('Could not copy automatically. Select the number above and copy it manually.'); }} />}
         <Button title="Close contact" outline disabled={busy} onPress={() => setVisible(false)} />
       </Card></ScrollView></View>
     </Modal>

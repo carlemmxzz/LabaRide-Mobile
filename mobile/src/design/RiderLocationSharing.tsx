@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Platform, View } from 'react-native';
 import * as Location from 'expo-location';
@@ -23,6 +24,7 @@ export function RiderLocationSharingProvider({ children }: { children: React.Rea
   const [lastSent, setLastSent] = useState('');
   const [error, setError] = useState('');
   const starting = useRef(false);
+  const announceStart = useRef(false);
   useEffect(() => { const listener = AppState.addEventListener('change', state => setForeground(state === 'active')); return () => listener.remove(); }, []);
   useEffect(() => { setEnabled(false); setLastSent(''); setError(''); }, [user?.id]);
   useEffect(() => { if (enabled && jobs.isSuccess && !assignmentKey) { setEnabled(false); setLastSent(''); } }, [enabled, jobs.isSuccess, assignmentKey]);
@@ -32,6 +34,7 @@ export function RiderLocationSharingProvider({ children }: { children: React.Rea
     try {
       if (Platform.OS === 'web' && !window.isSecureContext) throw new Error('Browser location sharing needs HTTPS or localhost. Use the mobile app when testing over an HTTP Wi-Fi address.');
       if ((await Location.requestForegroundPermissionsAsync()).status !== 'granted') throw new Error('Allow location access to share your position with customers. You can enable it in your device or browser settings.');
+      announceStart.current = true;
       setEnabled(true);
     } catch (failure) { setError(message(failure)); }
     finally { starting.current = false; setBusy(false); }
@@ -58,7 +61,9 @@ export function RiderLocationSharingProvider({ children }: { children: React.Rea
       uploading = (async () => {
         try {
           const result = await send({ sharing: true, sessionId, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, capturedAt: Math.round(position.timestamp) });
-          if (live && result.sharedJobs > 0) { setLastSent(result.receivedAt); setError(''); }
+          if (live && result.sharedJobs > 0) { setLastSent(result.receivedAt); setError('');
+            if (announceStart.current) { announceStart.current = false; toast.info({ title: 'Location sharing on', message: 'Customers can follow your delivery.' }); }
+          }
         } catch (failure) { if (live) setError(`Location was not shared. ${message(failure)}`); }
         finally { uploading = null; }
       })();
@@ -81,7 +86,7 @@ export function RiderLocationSharingProvider({ children }: { children: React.Rea
       void (async () => { try { await uploading; await send({ sharing: false, sessionId }); } catch {} })();
     };
   }, [enabled, foreground, assignmentKey, token]);
-  const state: SharingState = { enabled, busy, activeJobs: active.length, paused: !foreground || !active.length, lastSent, error, start, stop: () => { setEnabled(false); setLastSent(''); setError(''); } };
+  const state: SharingState = { enabled, busy, activeJobs: active.length, paused: !foreground || !active.length, lastSent, error, start, stop: () => { announceStart.current = false; setEnabled(false); setLastSent(''); setError(''); toast.info({ title: 'Location sharing off' }); } };
   return <SharingContext.Provider value={state}>{children}</SharingContext.Provider>;
 }
 

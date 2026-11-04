@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, View, useWindowDimensions } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -145,14 +146,14 @@ export function RiderOnboardingDesign({ onSubmitted }: { onSubmitted: () => void
       if (result.canceled) return;
       const imageBase64 = result.assets[0]?.base64;
       if (!imageBase64 || imageBase64.length > 8 * 1024 * 1024) throw new Error('Choose a clear document photo smaller than 6 MB.');
-      await api.put(`/delivery/application/documents/${type}`, { imageBase64 }); await refresh(); setNotice('Document uploaded privately.');
+      await api.put(`/delivery/application/documents/${type}`, { imageBase64 }); await refresh(); toast.success({ title: 'Document uploaded', message: `${riderDocumentLabels[type as keyof typeof riderDocumentLabels]} is waiting for review.` });
     } catch (failure) { setError(message(failure)); }
     finally { setUploading(null); setBusy(false); }
   }
   async function submit() {
     if (busy) return;
     setBusy(true); setError('');
-    try { await api.post('/delivery/application/submit', { acknowledge }); await refresh(); onSubmitted(); }
+    try { await api.post('/delivery/application/submit', { acknowledge }); await refresh(); onSubmitted(); toast.success({ title: 'Application submitted', message: "We'll review it and let you know." }); }
     catch (failure) { setError(message(failure)); }
     finally { setBusy(false); }
   }

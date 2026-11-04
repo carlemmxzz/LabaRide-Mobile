@@ -25,9 +25,10 @@ export function FormError({ error }: { error?: string | null }) {
     <Txt style={{ color: palette.danger }}>{error}</Txt>
   </View>;
 }
-export function AddressFields({ values, setValues }: {
+export function AddressFields({ values, setValues, columns = 1 }: {
   values: Record<string, string>;
   setValues: Dispatch<SetStateAction<Record<string, string>>>;
+  columns?: 1 | 2;
 }) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -85,17 +86,39 @@ export function AddressFields({ values, setValues }: {
       setLocating(false);
     }
   }
+  if (columns === 2) return <View testID="compact-shop-address" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 24 }}>
+    <View style={{ flex: 1.15, minWidth: 0, gap: 12 }}>
+      <Txt style={{ fontSize: 11, color: '#626B7D' }}>Fields marked * are required.</Txt>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{[
+        ['address_line_1', 'Address line 1 *', 'Street number and street name'],
+        ['address_line_2', 'Address line 2 (optional)', 'Suite, unit, apartment, or room'],
+        ['city', 'City / Municipality *', 'City or municipality'],
+        ['state_province', 'State / Province / Region *', 'State, province, or region'],
+        ['postal_code', 'ZIP / Postal code *', 'ZIP or postal code'],
+        ['country', 'Country *', 'Country'],
+      ].map(([key, label, placeholder]) => <View key={key} style={{ flexBasis: '47%', flexGrow: 1, minWidth: 0 }}><Field compact label={label} placeholder={placeholder} value={values[key] || ''} onChangeText={text => setValues(current => ({ ...current, [key]: text }))} /></View>)}</View>
+      <View style={{ gap: 4 }}><Txt style={{ fontSize: 12, fontWeight: '600' }}>Address type *</Txt><View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16 }}>{['Home', 'Work', 'Hotel', 'Apartment'].map(type => <Choice key={type} label={type} selected={values.address_type === type} onPress={() => setValues(current => ({ ...current, address_type: type }))} />)}</View></View>
+      <Field compact label="Access code (optional)" placeholder="Gate code, intercom number, or buzzer" value={values.access_code || ''} onChangeText={access_code => setValues(current => ({ ...current, access_code }))} />
+    </View>
+    <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><Txt style={{ fontSize: 13, fontWeight: '600', flex: 1 }}>Map location (optional)</Txt><Button title={point ? 'Update current position' : 'Use current position'} compact outline busy={locating} onPress={locate} /></View>
+      <Txt style={{ fontSize: 12, lineHeight: 18, color: '#626B7D' }}>Pin your shop or use your current position. Check that the pin matches the address.</Txt>
+      <FormError error={locationError} />
+      <View style={{ height: 185, borderRadius: 10, overflow: 'hidden' }}><LaundryMap latitude={point?.latitude ?? 13.6217} longitude={point?.longitude ?? 123.1948} onPin={handlePin} /></View>
+      <Field compact label="Dropoff instructions (optional)" placeholder="Entry details or instructions for the rider" multiline style={{ minHeight: 64, textAlignVertical: 'top' }} value={values.dropoff_instructions || ''} onChangeText={dropoff_instructions => setValues(current => ({ ...current, dropoff_instructions }))} />
+    </View>
+  </View>;
   return <View>
     <Txt style={[styles.muted, { marginBottom: 12 }]}>Fields marked * are required.</Txt>
-    {[
+    <View>{[
       ["address_line_1", "Address line 1 *", "Street number and street name"],
       ["address_line_2", "Address line 2 (optional)", "Suite, unit, apartment, or room"],
       ["city", "City / Municipality *", "City or municipality"],
       ["state_province", "State / Province / Region *", "State, province, or region"],
       ["postal_code", "ZIP / Postal code *", "ZIP or postal code"],
       ["country", "Country *", "Country"],
-    ].map(([key, label, placeholder]) => <Field key={key} label={label} placeholder={placeholder}
-      value={values[key] || ""} onChangeText={text => setValues(current => ({ ...current, [key]: text }))} />)}
+    ].map(([key, label, placeholder]) => <View key={key}><Field label={label} placeholder={placeholder}
+      value={values[key] || ""} onChangeText={text => setValues(current => ({ ...current, [key]: text }))} /></View>)}</View>
     <Section title="Map location (optional)" />
     <Txt style={[styles.muted, { marginBottom: 12 }]}>If you are at this address, save your current position to help locate nearby shops. Check that it matches the address above.</Txt>
     <Button title={point ? "Update current position" : "Use current position"} outline busy={locating} onPress={locate} />

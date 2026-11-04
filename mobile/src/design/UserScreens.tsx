@@ -1,8 +1,8 @@
+import { NotificationBell } from "./NotificationBell";
 import { coordinates, nearestShops, nearbyShops } from "./discovery";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import {
-  Bell,
   ArrowUpRight,
   UserRound,
   Store,
@@ -140,9 +140,7 @@ export function UserHomeDesign() {
     });
   };
   const firstName = (profile.data?.name || user?.name || "").trim().split(/\s+/)[0];
-  const serviceFilters = Array.from(new Set((shops.data || []).flatMap(shop => (shop.services || []).map(service => service.serviceName)))).slice(0, 4);
-  const displayed = filter === "nearby" ? nearby.map(item => item.shop) :
-    (shops.data || []).filter(shop => filter === "all" || shop.services?.some(service => `service:${service.serviceName}` === filter));
+  const displayed = filter === "nearby" ? nearby.map(item => item.shop) : shops.data || [];
   return <Screen back={false}>
     <View style={[styles.stack, { gap: 16 }]}>
       <View style={[styles.row, { alignItems: "flex-start", gap: width < 360 ? 8 : 16 }]}>
@@ -156,7 +154,7 @@ export function UserHomeDesign() {
           </Pressable>
         </View>
         <View style={[styles.row, { flexShrink: 0, gap: 8, paddingTop: 4 }]}>{!guest && user && <View ref={notificationBell} collapsable={false}>
-          <IconButton label="Notifications" onPress={toggleNotifications}><Bell size={22} color={palette.primary} /></IconButton>
+          <IconButton label="Notifications" onPress={toggleNotifications}><NotificationBell size={22} color={palette.primary} /></IconButton>
         </View>}
         <IconButton label="Your profile" onPress={() => router.push("/(user)/profile")}><UserRound size={22} color={palette.primary} /></IconButton></View>
       </View>
@@ -165,7 +163,7 @@ export function UserHomeDesign() {
       <View style={{ gap: 12 }}>
         <Txt style={styles.heading}>Find your laundry care</Txt>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-          {[{ value: "all", label: "All shops" }, { value: "nearby", label: "Nearby" }, ...serviceFilters.map(name => ({ value: `service:${name}`, label: name }))].map(item =>
+          {[{ value: "all", label: "All shops" }, { value: "nearby", label: "Nearby" }].map(item =>
             <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: filter === item.value }} onPress={() => setFilter(item.value)}
               style={{ minHeight: 44, paddingHorizontal: 18, justifyContent: "center", borderRadius: 24, borderWidth: 1,
                 borderColor: filter === item.value ? palette.primary : palette.line, backgroundColor: filter === item.value ? palette.primary : "white" }}>
@@ -342,6 +340,8 @@ export function ShopInfoDesign({
   about?: boolean;
 }) {
   const palette = usePalette();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 1000;
   const { go: openFlow, inShop } = useFlowNavigation();
   const result = useShop(id);
   const [tab, setTab] = useState("About");
@@ -364,6 +364,7 @@ export function ShopInfoDesign({
       footer={
         <Button
           title="Browse services"
+          style={desktop ? { alignSelf: 'flex-end', minWidth: 240 } : undefined}
           color={palette.navy}
           onPress={() =>
             inShop ? openFlow("shop-menu", { id: String(id) }) : router.push({
@@ -374,15 +375,17 @@ export function ShopInfoDesign({
         />
       }
     >
-      <View style={styles.stack}>
-        <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} style={{ maxHeight: 360 }} />
-        <View style={{ gap: 8, paddingVertical: 8 }}>
+      <View testID="shop-information" style={[styles.stack, { gap: desktop ? 28 : 20 }]}>
+        <View style={{ flexDirection: desktop ? 'row' : 'column', alignItems: desktop ? 'center' : 'stretch', gap: desktop ? 32 : 20 }}>
+        <ShopPhoto name={shop.shopName} photoUrl={shop.photoUrl} style={desktop ? { width: '40%', height: 300, aspectRatio: undefined, flexShrink: 0 } : { width: '100%', maxHeight: 280 }} />
+        <View style={{ flex: desktop ? 1 : undefined, minWidth: 0, gap: 12, paddingVertical: 8 }}>
           <Txt style={styles.title}>{shop.shopName}</Txt>
           <Txt style={styles.muted}>Shop ID: {shop.id}</Txt>
           <Txt style={{ color: availability.isOpen ? palette.primary : palette.muted }}>{availability.message}</Txt>
           <Txt style={styles.muted}>Delivery area: {serviceAreaLabel(shop, "delivery")}</Txt>
           <Txt style={styles.muted}>{shop.pickupEnabled ? `Laundry collection area: ${serviceAreaLabel(shop, "pickup")}` : "Laundry collection is not offered"}</Txt>
           <Txt style={{ color: palette.muted, fontSize: 12 }}>Service areas use straight-line distance from the shop. Collecting finished laundry at the shop has no distance limit.</Txt>
+        </View>
         </View>
         {about && (
           <TabsRow
@@ -393,8 +396,8 @@ export function ShopInfoDesign({
           />
         )}
         {tab === "About" && (
-          <>
-            <Card>
+          <View style={{ flexDirection: desktop ? 'row' : 'column', alignItems: 'stretch', gap: 16 }}>
+            <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0 }}>
               <View style={styles.row}>
                 <Clock color={palette.navy} size={22} />
                 <Txt style={styles.heading}>Business Hours</Txt>
@@ -404,27 +407,28 @@ export function ShopInfoDesign({
                 {shop.openingTime || "—"} – {shop.closingTime || "—"}
               </Txt>
             </Card>
-            <Card>
+            <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0 }}>
               <View style={styles.row}>
                 <Phone color={palette.navy} size={22} />
                 <Txt style={styles.heading}>Contact Information</Txt>
               </View>
               <Txt>{shop.contactNumber || "Not provided"}</Txt>
             </Card>
-            <Card>
+            <Card style={{ flex: desktop ? 1 : undefined, minWidth: 0 }}>
               <View style={styles.row}>
                 <MapPin color={palette.navy} size={22} />
                 <Txt style={styles.heading}>Address</Txt>
               </View>
               <Txt style={styles.muted}>{address(shop)}</Txt>
             </Card>
-          </>
+          </View>
         )}
         <Section title={tab === "Pricing" ? "Pricing" : "Services"} />
+        <View style={{ flexDirection: desktop ? 'row' : 'column', flexWrap: 'wrap', gap: 16 }}>
         {(shop.services || []).map((service) => (
-          <Card key={service.id}>
-            <View style={styles.between}>
-              <Txt style={{ fontWeight: "600", color: palette.navy }}>
+          <Card key={service.id} style={{ flexGrow: 1, flexBasis: desktop ? '47%' : undefined, minWidth: 0 }}>
+            <View style={[styles.between, { gap: 12 }]}>
+              <Txt style={{ flex: 1, fontWeight: "600", color: palette.navy }}>
                 {service.serviceName}
               </Txt>
               <Txt style={{ color: palette.navy }}>
@@ -433,6 +437,7 @@ export function ShopInfoDesign({
             </View>
           </Card>
         ))}
+        </View>
         {!shop.services?.length && (
           <Txt style={styles.muted}>No services listed yet.</Txt>
         )}
