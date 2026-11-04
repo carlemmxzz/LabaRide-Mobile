@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -35,7 +36,7 @@ export function ShopRequirementsPanel({ shopId, admin = false, title = 'Shop ver
       const imageBase64 = result.assets[0]?.base64;
       if (!imageBase64 || imageBase64.length > 8 * 1024 * 1024) throw new Error('Choose a clear JPG, PNG or WebP image smaller than 6 MB.');
       await api.put(`/shops/${shopId}/documents/${type}`, { imageBase64 });
-      await refresh(); setNotice(`${labels[type]} uploaded privately. It needs admin verification.`);
+      await refresh(); toast.success({ title: 'Document uploaded', message: `${labels[type]} is waiting for review.` });
     } catch (failure) { setError(message(failure)); }
     finally { setBusy(''); }
   }

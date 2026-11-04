@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useState, useRef } from "react";
 import { View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -14,7 +15,6 @@ export function ShopPhotoEditor({ shop }: { shop: Shop }) {
   const active = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   async function refresh(photoUrl: string | null) {
     cache.setQueryData<Shop>(["shop", "owner", shop.userId], current => current ? { ...current, photoUrl } : current);
     await Promise.all([
@@ -24,7 +24,7 @@ export function ShopPhotoEditor({ shop }: { shop: Shop }) {
   }
   async function upload() {
     if (active.current) return;
-    active.current = true; setBusy(true); setError(null); setSuccess(null);
+    active.current = true; setBusy(true); setError(null);
     try {
       // The system picker gives access only to the image the owner selects;
       // requesting broader photo-library access is unnecessary.
@@ -36,19 +36,19 @@ export function ShopPhotoEditor({ shop }: { shop: Shop }) {
       if (image.base64.length > 8 * 1024 * 1024) { setError("Choose a photo smaller than 6 MB."); return; }
       const saved = await api.put<{ photoUrl: string }>(`/shops/${shop.id}/photo`, { imageBase64: image.base64 });
       await refresh(saved.photoUrl);
-      setSuccess("Shop photo updated. Customers can now see it on your shop cards.");
+      toast.success({ title: "Shop photo updated" });
     } catch (failure) { setError(message(failure)); }
     finally { active.current = false; setBusy(false); }
   }
   async function remove() {
     if (active.current) return;
-    active.current = true; setError(null); setSuccess(null);
+    active.current = true; setError(null);
     try {
       if (!await confirmAction("Remove shop photo", "Customers will see the photo placeholder until you upload another photo.", { confirmLabel: "Remove Photo", destructive: true })) return;
       setBusy(true);
       await api.delete(`/shops/${shop.id}/photo`);
       await refresh(null);
-      setSuccess("Shop photo removed.");
+      toast.info({ title: "Shop photo removed" });
     } catch (failure) { setError(message(failure)); }
     finally { active.current = false; setBusy(false); }
   }
@@ -63,6 +63,5 @@ export function ShopPhotoEditor({ shop }: { shop: Shop }) {
         icon={<Trash2 size={18} color={palette.danger} />} />}
     </View>
     <FormError error={error} />
-    {!!success && <Txt accessibilityLiveRegion="polite" style={{ color: palette.successInk }}>{success}</Txt>}
   </Card>;
 }

@@ -1,22 +1,17 @@
 import { Pressable, View } from "react-native";
 import { useRef, useState } from 'react';
+import { useIsFocused } from "expo-router";
+import { toast } from "./toast-service";
+import { useNotifications, useNotificationVisibility, notificationQueryKey, type Notification } from "./useNotificationToasts";
+export type { Notification } from "./useNotificationToasts";
 import { Trash2 } from 'lucide-react-native';
 import { router, type Href } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Screen, Section, Txt, Empty, Button, styles, usePalette } from "./ui";
 import { api, fail, go, confirmAction, message } from "./data";
 import { QueryState } from "./UserScreens";
 import { useAuthStore } from "../store/authStore";
 
-export interface Notification {
-  id: number;
-  transactionId: number;
-  title: string;
-  message: string;
-  createdAt: string;
-  readAt: string | null;
-  handoff?: { label: string; code: string };
-}
 
 export function NotificationsDesign({ shopMode = false, audience }: { shopMode?: boolean; audience?: 'rider' | 'admin' }) {
   const palette = usePalette();
@@ -25,14 +20,11 @@ export function NotificationsDesign({ shopMode = false, audience }: { shopMode?:
   const pendingDelete = useRef(false);
   const [deleting, setDeleting] = useState<number | 'read' | null>(null);
   const [error, setError] = useState('');
-  const queryKey = ["notifications", user?.id, shopMode, audience];
+  const queryKey = notificationQueryKey(user?.id, { shopMode, audience });
   const scope = `shopMode=${shopMode}${audience ? `&audience=${audience}` : ''}`;
-  const notifications = useQuery({
-    queryKey,
-    enabled: !!user,
-    queryFn: () => api.get<Notification[]>(`/notifications?${scope}`),
-    refetchInterval: 15000,
-  });
+  const notifications = useNotifications({ shopMode, audience });
+  const focused = useIsFocused();
+  useNotificationVisibility({ shopMode, audience }, notifications.data, focused);
   const today = new Date().toDateString();
   const readCount = notifications.data?.filter(item => !!item.readAt).length || 0;
   async function remove(item?: Notification) {
@@ -44,6 +36,7 @@ export function NotificationsDesign({ shopMode = false, audience }: { shopMode?:
       await api.delete(item ? `/notifications/${item.id}` : `/notifications/read?${scope}`);
       cache.setQueryData<Notification[]>(queryKey, current => current?.filter(record => item ? record.id !== item.id : !record.readAt));
       await cache.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      toast.info(item ? { title: 'Notification deleted' } : { title: 'Notifications cleared', message: 'Your read notifications are gone.' });
     } catch (failure) { setError(message(failure)); }
     finally { pendingDelete.current = false; setDeleting(null); }
   }

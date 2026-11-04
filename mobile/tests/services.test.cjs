@@ -30,7 +30,7 @@ function harness({ confirmed = true, failure, services } = {}) {
   const shop = { id: 5, services: services || [service], kiloPrices: [] };
   const result = { data: shop, isLoading: false, error: null, refetch() {} };
   const request = method => async (url, body) => { calls.push({ method, url, body }); if (failure) throw failure; };
-  const context = { exports: {}, React,
+  const context = { exports: {}, React, toast: { success() {}, info() {} },
     ...colorsModule.exports,
     serviceCardColors: colorsModule.exports.serviceCardColors,
     useSafeAreaInsets: () => ({ top: 0, bottom: 0 }), Platform: { OS: 'web' },

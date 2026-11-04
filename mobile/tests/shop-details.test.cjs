@@ -27,11 +27,11 @@ function elements(element, type) {
 }
 function harness(status = 'Approved') {
   let index = 0;
-  const hooks = [], calls = [], navigation = [], authChanges = [], invalidations = [];
+  const hooks = [], calls = [], navigation = [], authChanges = [], invalidations = [], toasts = [];
   const shop = { id: 5, shopName: 'Test Laundry', contactNumber: '09123456789', openingTime: '08:00', closingTime: '18:00',
     address_line_1: '12 Main Street', city: 'Naga', state_province: 'Camarines Sur', postal_code: '4400', country: 'Philippines', address_type: 'Work',
     approvalStatus: 'Approved', latitude: 13.62, longitude: 123.19 };
-  const context = { exports: {}, React, ...load('address.ts'), ...load('service-area.ts'), ...load('form-values.ts'),
+  const context = { exports: {}, React, toast: { success: options => toasts.push(options) }, ...load('address.ts'), ...load('service-area.ts'), ...load('form-values.ts'),
     useState(initial) {
       const slot = index++;
       if (!(slot in hooks)) hooks[slot] = initial;
@@ -52,7 +52,7 @@ function harness(status = 'Approved') {
   render();
   const field = label => elements(render(), 'Field').find(item => item.props.label === label);
   const save = () => elements(render().props.footer, 'Button')[0].props.onPress();
-  return { render, field, save, calls, navigation, authChanges, invalidations };
+  return { render, field, save, calls, navigation, authChanges, invalidations, toasts };
 }
 test('routine shop edits keep the owner on the form and retain shop mode after saving', async () => {
   const app = harness();
@@ -64,7 +64,8 @@ test('routine shop edits keep the owner on the form and retain shop mode after s
   assert.deepEqual(app.authChanges, []);
   assert.deepEqual(app.navigation, []);
   assert.deepEqual(app.invalidations, ['shop', 'shops']);
-  assert.ok(elements(app.render().props.footer, 'Txt').some(item => /remains approved/.test(item.props.children)));
+  assert.equal(app.toasts.length, 1);
+  assert.equal(app.toasts[0].title, 'Shop details saved');
 });
 test('identity edits that return pending approval pause shop mode and open the application page', async () => {
   const app = harness('Pending');

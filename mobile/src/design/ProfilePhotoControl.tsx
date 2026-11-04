@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Image, Modal, Pressable, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -18,7 +19,6 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
   const active = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string>();
   const uri = photoUri(userId, photoUrl);
@@ -31,7 +31,7 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
 
   async function upload() {
     if (active.current) return;
-    active.current = true; setBusy(true); setError(null); setNotice(null);
+    active.current = true; setBusy(true); setError(null);
     try {
       const selection = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false,
         allowsEditing: true, aspect: [1, 1], quality: 0.8, base64: true, exif: false });
@@ -42,7 +42,7 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
       const saved = await api.put<{ photoUrl: string }>(`/users/${userId}/photo`, { imageBase64 });
       await refresh(saved.photoUrl);
       setFailedUrl(undefined);
-      setNotice("Profile photo updated.");
+      toast.success({ title: "Photo updated", message: "Your new photo is live." });
     } catch (failure) { setError(message(failure)); }
     finally { active.current = false; setBusy(false); }
   }
@@ -52,11 +52,11 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
     active.current = true;
     try {
       if (!await confirmAction("Remove profile photo", "Your profile will show the default avatar again.", { confirmLabel: "Remove Photo", destructive: true })) return;
-      setBusy(true); setError(null); setNotice(null);
+      setBusy(true); setError(null);
       await api.delete(`/users/${userId}/photo`);
       await refresh(null);
       setFailedUrl(undefined);
-      setNotice("Profile photo removed.");
+      toast.info({ title: "Photo removed", message: "You can add a new one anytime." });
     } catch (failure) { setError(message(failure)); }
     finally { active.current = false; setBusy(false); }
   }
@@ -75,7 +75,6 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
       </Pressable>
     </View>
     {!!error && <Txt accessibilityLiveRegion="polite" style={{ maxWidth: 300, textAlign: "center", color: palette.danger, fontSize: 12 }}>{error}</Txt>}
-    {!!notice && <Txt accessibilityLiveRegion="polite" style={{ color: palette.successInk, fontSize: 12 }}>{notice}</Txt>}
     <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "rgba(20, 28, 45, 0.28)" }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close photo menu" onPress={() => setMenuOpen(false)} style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }} />

@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View, useWindowDimensions } from "react-native";
 import { ArrowRight, Check, CheckCircle2, Clock3, LockKeyhole, MapPin, Phone, RefreshCw, ShoppingBag, Store, TriangleAlert, Truck, type LucideIcon } from "lucide-react-native";
@@ -205,6 +206,10 @@ export function AdminShopApplicationsDesign() {
       await api.put(`/admin/shops/${decision.shop.id}/review`, {
         status: decision.status, expectedStatus: decision.shop.approvalStatus, expectedVersion: decision.shop.applicationVersion, reason: reason.trim(),
       });
+      const name = decision.shop.shopName;
+      if (decision.status === "Approved") toast.success({ title: decision.shop.approvalStatus === "Suspended" ? "Shop restored" : "Shop approved", message: decision.shop.approvalStatus === "Suspended" ? `${name} is active again.` : `${name} can now accept orders.` });
+      else if (decision.status === "Rejected") toast.warning({ title: "Shop rejected", message: `${name}'s application was declined.` });
+      else toast.warning({ title: "Shop suspended", message: `${name} can't take new orders.` });
       setDecision(null);
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["admin-shops"] }),

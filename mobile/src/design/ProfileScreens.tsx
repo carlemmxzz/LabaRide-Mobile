@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useEffect, useState, useRef } from "react";
 import { Modal, Pressable, Switch, View } from "react-native";
 import { ArrowLeft, ChevronRight, LogOut, Pencil } from "lucide-react-native";
@@ -197,7 +198,7 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
       const user = await api.put<Profile>(`/users/${auth.user.id}`, payload);
       await auth.setAuth(user, auth.token!);
       cache.setQueryData(["user", user.id], user);
-      notify("Profile", "Changes saved successfully");
+      toast.success({ title: "Profile updated", message: "Your changes are saved." });
       router.back();
     } catch (error) {
       fail(error);
@@ -446,7 +447,7 @@ export function ChangePasswordDesign({
       setCurrent("");
       setPassword("");
       setConfirm("");
-      notify("Change Password", "Password updated successfully");
+      toast.success({ title: "Password updated", message: "Use your new password next time you sign in." });
       if (!security) router.back();
     } catch (error) {
       fail(error);
@@ -710,6 +711,7 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
           asset="locationblue.png"
           onPress={() => {
             draft.set({ address: profile.data });
+            if (checkout) toast.info({ title: "Address selected", message: `Using ${profile.data?.address_type || "your default address"}.` });
             if (checkout) router.dismissTo(flowHref("checkout"));
             else go("confirm-location", { checkout: "false" });
           }}
@@ -722,6 +724,7 @@ export function AddressesDesign({ checkout = false }: { checkout?: boolean }) {
             asset="locationblue.png"
             onPress={() => {
               draft.set({ address: item });
+              if (checkout) toast.info({ title: "Address selected", message: `Using ${item.address_type || "your saved address"}.` });
               if (checkout) router.dismissTo(flowHref("checkout"));
               else go("confirm-location", { checkout: "false" });
             }}

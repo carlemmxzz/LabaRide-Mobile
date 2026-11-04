@@ -1,9 +1,10 @@
-import type { Notification } from "./NotificationsScreen";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { NotificationBell } from "./NotificationBell";
+import { useNotifications, useNotificationVisibility, notificationQueryKey, type Notification } from "./useNotificationToasts";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
 import { useRef } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
-import { Bell, ChevronRight, X } from "lucide-react-native";
+import { ChevronRight, X } from "lucide-react-native";
 import { api, fail, go, message } from "./data";
 import { Button, Empty, Txt, styles, usePalette } from "./ui";
 
@@ -18,15 +19,12 @@ export function RecentNotificationsModal({ anchor, onClose }: {
   const panelLeft = Math.max(12, Math.min(anchor.x + anchor.width - panelWidth, width - panelWidth - 12));
   const user = useAuthStore(state => state.user);
   const cache = useQueryClient();
-  const orders = useQuery({
-    queryKey: ["notifications", user?.id, false], enabled: !!user,
-    queryFn: () => api.get<Notification[]>("/notifications?shopMode=false"), refetchInterval: 15000,
-  });
+  const orders = useNotifications({ shopMode: false });
   async function open(notification: Notification) {
     try {
       if (!notification.readAt) {
         await api.put(`/notifications/${notification.id}/read`, {});
-        cache.setQueryData<Notification[]>(["notifications", user?.id, false], current =>
+        cache.setQueryData<Notification[]>(notificationQueryKey(user?.id, { shopMode: false }), current =>
           current?.map(item => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item));
       }
       onClose();
@@ -37,6 +35,7 @@ export function RecentNotificationsModal({ anchor, onClose }: {
   const recent = [...(orders.data || [])]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id)
     .slice(0, 5);
+  useNotificationVisibility({ shopMode: false }, recent);
 
   return <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={onClose}
     aria-labelledby="recent-notifications-title"
@@ -51,7 +50,7 @@ export function RecentNotificationsModal({ anchor, onClose }: {
           shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8, overflow: "hidden" }}>
         <View style={[styles.row, { padding: 20, borderBottomWidth: 1, borderBottomColor: palette.line }]}>
           <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: palette.soft, alignItems: "center", justifyContent: "center" }}>
-            <Bell size={22} color={palette.primary} />
+            <NotificationBell size={22} color={palette.primary} />
           </View>
           <View style={styles.grow}>
             <Txt nativeID="recent-notifications-title" accessibilityRole="header" style={{ fontSize: 19, fontWeight: "700" }}>Recent notifications</Txt>

@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -175,7 +176,7 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
       await setAuth(result.user, result.token);
       router.replace(result.user.isAdmin ? "/admin" : result.user.isRider ? "/rider" : result.user.riderApplicationStatus ? "/rider-application" as Href : result.user.isShopOwner ? "/shop/home" : "/(user)/home");
     } catch (error) {
-      fail(error);
+      toast.error({ title: "Couldn't sign in", message: message(error) });
     } finally {
       setBusy(false);
     }

@@ -1,9 +1,10 @@
+import { NotificationBell } from "./NotificationBell";
+import { toast } from "./toast-service";
 import { ORDERS_PER_PAGE, PageControls } from "./Pagination";
 import { useEffect, useState, useRef } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  Bell,
   WashingMachine,
   Clock,
   CheckSquare,
@@ -134,6 +135,7 @@ export function RegisterShopDesign() {
         cache.setQueryData(["shop", "owner", user.id], shop);
       }
       void cache.invalidateQueries({ queryKey: ["shops"] });
+      toast.success({ title: "Application submitted", message: "We'll review it and let you know." });
     } catch (failure) {
       setError(message(failure));
       void owned.refetch();
@@ -333,7 +335,7 @@ export function ShopHomeDesign() {
   const owned = useOwnedShop();
   const orders = useOrders(true);
   const list = orders.data || [];
-  return <Screen title="Dashboard" back={false} right={<IconButton label="Notifications" onPress={() => go("shop-notifications")}><Bell size={22} color={palette.primary} /></IconButton>}>
+  return <Screen title="Dashboard" back={false} right={<IconButton label="Notifications" onPress={() => go("shop-notifications")}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton>}>
     <View style={styles.stack}>
       <View><Txt style={styles.title}>{owned.data?.shopName || "Your shop overview"}</Txt><Txt style={styles.muted}>Your shop’s performance at a glance.</Txt></View>
       <QueryState loading={owned.isLoading || orders.isLoading} error={owned.error || orders.error} retry={() => { owned.refetch(); orders.refetch(); }} />
@@ -634,7 +636,6 @@ export function ShopDetailsFormDesign() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initializedShop = useRef<number | null>(null);
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
   useEffect(() => {
     if (owned.data && initializedShop.current !== owned.data.id) {
       initializedShop.current = owned.data.id;
@@ -652,7 +653,7 @@ export function ShopDetailsFormDesign() {
     const validation = !timeInputValue(values.openingTime) || !timeInputValue(values.closingTime) ? "Choose valid opening and closing times." : addressError(values)
       || distanceSettingsError({ ...values, pickupEnabled: values.pickupEnabled === "true" });
     if (validation) { setError(validation); return; }
-    setBusy(true); setError(null); setSavedMessage(null);
+    setBusy(true); setError(null);
     try {
       const updated = await api.put<Shop>("/shops/" + owned.data.id, {
         ...addressPayload(values), shopName: values.shopName,
@@ -664,7 +665,7 @@ export function ShopDetailsFormDesign() {
       await cache.invalidateQueries({ queryKey: ["shop"] });
       await cache.invalidateQueries({ queryKey: ["shops"] });
       if (updated.approvalStatus === "Approved") {
-        setSavedMessage("Changes saved. Your shop remains approved and visible.");
+        toast.success({ title: "Shop details saved", message: "Customers will see the update." });
         return;
       }
       const auth = useAuthStore.getState();
@@ -674,7 +675,6 @@ export function ShopDetailsFormDesign() {
     finally { setBusy(false); }
   }
   return <Screen title="Shop Details" background={palette.surface} footer={<View>
-    {!!savedMessage && <Txt accessibilityLiveRegion="polite" style={{ color: palette.primary, marginBottom: 12 }}>{savedMessage}</Txt>}
     <FormError error={error} /><Button title="Save Changes" color={palette.navy} busy={busy} onPress={save} />
   </View>}>
     <View style={styles.stack}>
@@ -803,6 +803,7 @@ export function ServicesDesign() {
       await cache.invalidateQueries({ queryKey: ["shop"] });
       await cache.invalidateQueries({ queryKey: ["shops"] });
       setDialog(null);
+      toast.success(dialog === "service" ? { title: editing ? "Service updated" : "Service added", message: editing ? `${values.serviceName.trim()} is saved.` : `${values.serviceName.trim()} is now on your menu.` } : { title: "Price range added" });
     } catch (failure) {
       setError(message(failure));
       if (dialog === "service") void cache.invalidateQueries({ queryKey: ["shop"] });
@@ -823,6 +824,7 @@ export function ServicesDesign() {
         cache.invalidateQueries({ queryKey: ["shops"] }),
       ]);
       if (editing?.id === service.id && dialog === "service") setDialog(null);
+      toast.info({ title: "Service deleted", message: `${service.serviceName} was removed.` });
     } catch (failure) { setError(message(failure)); }
     finally { deleting.current = false; setBusy(false); }
   }

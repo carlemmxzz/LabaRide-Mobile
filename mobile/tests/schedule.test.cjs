@@ -33,7 +33,7 @@ function harness({ time = '2026-10-22T10:30:00+08:00', schedule = '', pickup = f
     constructor(...args) { if (args.length) super(...args); else super(clock); }
     static now() { return clock; }
   }
-  const context = { exports: {}, React, Date: FakeDate, ...load('delivery-slots.ts'), ...load('schedule.ts'), ...load('form-values.ts'), ...load('shop-hours.ts'),
+  const context = { exports: {}, React, toast: { success() {} }, Date: FakeDate, ...load('delivery-slots.ts'), ...load('schedule.ts'), ...load('form-values.ts'), ...load('shop-hours.ts'),
     useState(initial) { const slot = index++; if (!(slot in hooks)) hooks[slot] = typeof initial === 'function' ? initial() : initial; return [hooks[slot], value => { hooks[slot] = typeof value === 'function' ? value(hooks[slot]) : value; }]; },
     useRef(initial) { const slot = index++; if (!(slot in hooks)) hooks[slot] = { current: initial }; return hooks[slot]; },
     useEffect(effect) { if (!effectSet) { effectSet = true; effect(); } },

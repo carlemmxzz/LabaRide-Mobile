@@ -1,8 +1,8 @@
+import { NotificationBell } from "./NotificationBell";
 import { coordinates, nearestShops, nearbyShops } from "./discovery";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import {
-  Bell,
   ArrowUpRight,
   UserRound,
   Store,
@@ -154,7 +154,7 @@ export function UserHomeDesign() {
           </Pressable>
         </View>
         <View style={[styles.row, { flexShrink: 0, gap: 8, paddingTop: 4 }]}>{!guest && user && <View ref={notificationBell} collapsable={false}>
-          <IconButton label="Notifications" onPress={toggleNotifications}><Bell size={22} color={palette.primary} /></IconButton>
+          <IconButton label="Notifications" onPress={toggleNotifications}><NotificationBell size={22} color={palette.primary} /></IconButton>
         </View>}
         <IconButton label="Your profile" onPress={() => router.push("/(user)/profile")}><UserRound size={22} color={palette.primary} /></IconButton></View>
       </View>

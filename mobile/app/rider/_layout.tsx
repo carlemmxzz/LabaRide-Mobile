@@ -1,6 +1,7 @@
+import { NotificationBell } from "../../src/design/NotificationBell";
 import { Tabs, Redirect } from 'expo-router';
 import { View, useWindowDimensions } from 'react-native';
-import { Bike, History, Bell, LayoutDashboard } from 'lucide-react-native';
+import { Bike, History, LayoutDashboard } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../src/design/data';
 import { Brand, Button, Empty, Screen, Txt, usePalette } from '../../src/design/ui';
@@ -28,6 +29,6 @@ export default function RiderTabs() {
     <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={24} /> }} />
     <Tabs.Screen name="jobs" options={{ title: 'My jobs', tabBarIcon: ({ color }) => <Bike color={color} size={24} /> }} />
     <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color }) => <History color={color} size={24} /> }} />
-    <Tabs.Screen name="notifications" options={{ title: 'Updates', tabBarIcon: ({ color }) => <Bell color={color} size={24} /> }} />
+    <Tabs.Screen name="notifications" options={{ title: 'Updates', tabBarIcon: ({ color }) => <NotificationBell audience="rider" color={color} size={24} /> }} />
   </Tabs></RiderLocationSharingProvider>;
 }

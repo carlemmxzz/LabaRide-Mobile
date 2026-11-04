@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,7 +50,9 @@ export function RiderAvailableJobsDesign() {
   async function availability(online: boolean, position?: { latitude: number; longitude: number }) {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError('');
-    try { await api.put('/delivery/availability', { online, ...position }); await refreshAll(); }
+    try { await api.put('/delivery/availability', { online, ...position }); await refreshAll();
+      if (online) toast.success({ title: "You're online", message: 'You can now receive pickup and delivery jobs.' });
+      else toast.info({ title: "You're offline", message: "You won't get new jobs." }); }
     catch (failure) { setError(message(failure)); }
     finally { pending.current = false; setBusy(false); }
   }
@@ -76,6 +79,7 @@ export function RiderAvailableJobsDesign() {
       setBusy(true);
       await api.put(`/delivery/orders/${job.id}/claim`, { stage: job.stage, expectedVersion: job.workflowVersion });
       await refreshAll();
+      toast.success({ title: 'Job accepted' });
       router.push('/rider/jobs');
     } catch (failure) { setError(message(failure)); await query.refetch(); }
     finally { pending.current = false; setBusy(false); setClaimingId(null); }

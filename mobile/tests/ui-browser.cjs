@@ -795,13 +795,16 @@ async function clickText(text) {
       assert.ok((await evaluate('document.body.innerText')).includes('Calling requires a phone app configured'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
       const shot = await command('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(artifacts, `call-contact-${width}.png`), Buffer.from(shot.data, 'base64'));
-      await clickText('Copy number'); await waitFor('document.body.innerText.includes("Phone number copied.")');
+      await clickText('Copy number'); await waitFor('document.body.innerText.includes("Number copied")');
       assert.equal(await evaluate('window.copiedPhoneNumbers.at(-1)'), '09987654321');
-      await clickText('Close contact');
+      await waitFor('!document.body.innerText.includes("Call contact")');
       await evaluate(`Array.from(document.querySelectorAll('[role=button]')).filter(e=>e.innerText.trim()==='Call')[1].click()`);
       await waitFor('document.body.innerText.includes("Call contact")');
       assert.equal(await evaluate(`document.querySelector('[aria-label="Contact phone number"]').textContent`), '09123456789');
       await clickText('Copy number'); assert.equal(await evaluate('window.copiedPhoneNumbers.at(-1)'), '09123456789');
+      await waitFor('!document.body.innerText.includes("Call contact")');
+      await evaluate(`Array.from(document.querySelectorAll('[role=button]')).filter(e=>e.innerText.trim()==='Call')[1].click()`);
+      await waitFor('document.body.innerText.includes("Call contact")');
       await evaluate(`navigator.clipboard.writeText=async()=>{throw new Error('Clipboard blocked')};document.execCommand=()=>false;`);
       await clickText('Copy number'); await waitFor('document.body.innerText.includes("Select the number above and copy it manually")');
       await clickText('Close contact');
