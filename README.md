@@ -237,6 +237,37 @@ Run server checks with `npm run build` followed by
 
 ## Migration Notes
 
+### Admin customer management
+
+The Customers tab and dashboard shortcut support customer search, pagination,
+Active/Blocked/All filters, and confirmed block/unblock decisions with a required
+reason. Admin, shop-owner, rider and rider-applicant accounts are excluded.
+Each decision is audited; blocking denies login, authenticated API requests and
+socket sessions. Existing orders are retained.
+
+Deploy the updated API together with migration `20261104000000_customer_access`.
+From `server/`, run `npm run prisma:generate`, `npm run prisma:deploy`, and
+`npm run build`, then restart the API. For Render, push to its configured branch
+and deploy that commit; restarting Expo alone does not update the hosted API.
+Run `npm run test:customers` for isolated authorization and blocking checks.
+
+### Order invoices
+
+Customers and shop owners can open **View invoice** from order details. Riders
+can open it on accepted jobs in **My Jobs** and completed jobs in **History**.
+Invoices use the order's saved service subtotal, delivery fee, discount and total,
+with a stable `LR-000042` number, order status and payment method. They reflect
+current charges, including measured-weight updates; they do not mark orders paid.
+Web supports a printable view and browser Save as PDF; native supports text sharing.
+
+Deploy the updated backend and frontend together. The authenticated endpoint is
+`GET /api/transactions/:id/invoice`; it restricts access to the customer, approved
+shop owner, accepted/completed assigned riders and admins. No schema migration is
+required. A frontend connected to an older API will receive a 404 until the API
+is updated. Validate with `npm run build` and `node --test tests/invoice.test.cjs`
+in `server/`, and `npm run typecheck`, `node --test tests/invoice.test.cjs`,
+`npm run build:web`, then `node tests/ui-browser.cjs --invoices` in `mobile/`.
+
 The original Flutter screen designs and assets are recreated in `mobile/src/design`
 and `mobile/assets/flutter`. See [the screen migration map](mobile/docs/FLUTTER_DESIGN_MIGRATION.md)
 for all 74 source design files, React Native routes, and API support. Captured mobile

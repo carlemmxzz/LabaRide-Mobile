@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const artifacts = path.join(root, 'artifacts/ui-redesign');
 const photoTest = process.argv.includes('--photos');
 const approvalTest = process.argv.includes('--approvals');
+const invoiceTest = process.argv.includes('--invoices');
 const weightTest = process.argv.includes('--weight-evidence');
 const responseTest = process.argv.includes('--assignment-response');
 const pullTest = process.argv.includes('--pull-jobs');
@@ -23,6 +24,10 @@ const dispatchTest = process.argv.includes('--dispatch');
 const applicationTest = process.argv.includes('--application');
 const dialogTest = process.argv.includes('--dialogs');
 const logoutTest = process.argv.includes('--logout');
+const brandTest = process.argv.includes('--branding');
+const shopBrowseTest = process.argv.includes('--shop-browsing');
+const desktopSettingsTest = process.argv.includes('--desktop-settings');
+const settingsWrites = [];
 const scheduleTest = process.argv.includes('--schedule');
 const shopOrdersTest = process.argv.includes('--shop-orders');
 const liveOperationsTest = process.argv.includes('--live-operations');
@@ -53,6 +58,10 @@ if (servicesTest) {
 let notificationRecords = [], failNotificationDelete = false;
 const notificationDeletes = [];
 const shopDocumentFixture = [];
+if (desktopSettingsTest) {
+  shops[0].requirementsVersion = 1;
+  shopDocumentFixture.push(...['DTIRegistration','TinProof','MayorsPermit'].map(type=>({type,status:'Verified',updatedAt:'2026-11-04T00:00:00Z'})));
+}
 const requirementDocuments = ['ApplicantPhoto', 'ProfessionalLicense', 'Clearance', 'TinProof', 'OfficialReceipt', 'RegistrationCertificate'];
 const requirementFixture = { userId: 7, applicationStatus: 'Draft', registeredOwner: true, licenseNumber: 'TEST-PRO-123', licenseExpiry: '2030-12-31T00:00:00Z', motorcycleMake: 'Test brand', motorcycleModel: 'Test model', motorcycleYear: 2020, plateNumber: 'TEST123', missing: [], documents: requirementDocuments.map((type, index) => ({ id: index + 1, type, status: 'Pending', updatedAt: new Date().toISOString() })), user: { name: user.name, email: user.email, phone: '09123456789', birthdate: '1995-05-10T00:00:00Z', address_line_1: '123 Test Street', city: 'Naga', state_province: 'Camarines Sur', postal_code: '4400' } };
 const deliveryJobs = [
@@ -148,7 +157,7 @@ async function waitFor(expression, timeout = 10000) {
 async function visit(route, width, expected, screenshot) {
   errors = [];
   if (sessionScriptId) await command('Page.removeScriptToEvaluateOnNewDocument',{identifier:sessionScriptId});
-  const fixedClock = scheduleTest ? `const OriginalDate=Date;globalThis.Date=class extends OriginalDate{constructor(...args){super(...(args.length?args:[Date.parse('2026-10-22T02:30:00Z')]));}static now(){return OriginalDate.parse('2026-10-22T02:30:00Z');}};` : '';
+  const fixedClock = scheduleTest || shopBrowseTest ? `const OriginalDate=Date;globalThis.Date=class extends OriginalDate{constructor(...args){super(...(args.length?args:[Date.parse('2026-10-22T02:30:00Z')]));}static now(){return OriginalDate.parse('2026-10-22T02:30:00Z');}};` : '';
   const savedAddressFixture = scheduleTest ? `localStorage.setItem('labaride-addresses:7',${JSON.stringify(JSON.stringify([{ ...user, address_line_1: '88 Saved Address Street', address_type: 'Work', access_code: 'Gate 2', dropoff_instructions: 'Ring the bell' }]))});` : '';
   const script = await command('Page.addScriptToEvaluateOnNewDocument',{source:`${fixedClock}${savedAddressFixture}sessionStorage.setItem('auth_token','isolated-ui-test');sessionStorage.setItem('auth_user',${JSON.stringify(JSON.stringify(user))});`});
   sessionScriptId = script.identifier;
@@ -174,7 +183,7 @@ async function clickText(text) {
   await pause(150);
 }
 (async () => {
-  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest) {
+  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest || desktopSettingsTest) {
     const sharp = require('../../server/node_modules/sharp');
     photoBytes = await sharp({ create: { width: 240, height: 160, channels: 3, background: '#2457AD' } }).jpeg().toBuffer();
     fs.writeFileSync(path.join(artifacts,'upload-test.jpg'),photoBytes);
@@ -200,6 +209,12 @@ async function clickText(text) {
     if (message.method === 'Fetch.requestPaused') {
       const { requestId, request } = message.params;
       try {
+        if(shopBrowseTest && request.url.includes('unpkg.com/leaflet')) {
+          // Isolated map fixture: validate coordinates and marker placement without tile requests.
+          const js = `window.L={map:function(node){node.style.background='repeating-linear-gradient(0deg,#EDF3F7,#EDF3F7 39px,#DEE7EF 40px)';return{node:node,attributionControl:{setPrefix:function(){}},setView:function(coords){node.dataset.center=JSON.stringify(coords);return this},fitBounds:function(){return this},stop:function(){},remove:function(){node.innerHTML=''},on:function(){return this}}},tileLayer:function(){return{addTo:function(){return this}}},divIcon:function(o){return o},marker:function(coords){return{addTo:function(map){var pin=document.createElement('div');pin.className='shop-test-marker';pin.dataset.latitude=coords[0];pin.dataset.longitude=coords[1];pin.textContent='Shop pin';pin.style.cssText='position:absolute;left:50%;top:50%;color:#2457AD;font-weight:bold';map.node.appendChild(pin);return this},bindPopup:function(){return this},on:function(){return this}}},featureGroup:function(){return{getBounds:function(){return{pad:function(){return this}}}}}};`;
+          await command('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:request.url.includes('.js')?'application/javascript':'text/css'},{name:'Access-Control-Allow-Origin',value:'*'}],body:Buffer.from(request.url.includes('.js')?js:'').toString('base64')});
+          return;
+        }
         if(pullTest && request.url.includes('unpkg.com/leaflet')) {
           const js = `window.L={map:function(id){var node=document.getElementById(id);node.style.background='repeating-linear-gradient(0deg,#EDF3F7,#EDF3F7 39px,#DEE7EF 40px)';return{node:node,layers:[],fitBounds:function(points){this.points=points;var self=this;var ys=points.map(p=>p[0]),xs=points.map(p=>p[1]);function project(p){return[25+(p[1]-Math.min(...xs))/(Math.max(...xs)-Math.min(...xs)||1)*(node.clientWidth-50),25+(Math.max(...ys)-p[0])/(Math.max(...ys)-Math.min(...ys)||1)*(node.clientHeight-50)]}this.layers.forEach(layer=>{if(layer.point){var p=project(layer.point);layer.node.style.cssText='position:absolute;left:'+p[0]+'px;top:'+p[1]+'px;transform:translate(-50%,-50%);z-index:2'}else if(layer.coords){layer.poly.setAttribute('points',layer.coords.map(p=>project(p).join(',')).join(' '))}})},invalidateSize:function(){},removeLayer:function(layer){layer.node.remove();this.layers=this.layers.filter(x=>x!==layer)}}},tileLayer:function(){return{addTo:function(){return this},on:function(){return this}}},divIcon:function(o){return o},marker:function(point,opts){return{point:point,node:document.createElement('div'),addTo:function(map){this.node.innerHTML=opts.icon.html;map.node.appendChild(this.node);map.layers.push(this);return this},setLatLng:function(point){this.point=point;return this},setIcon:function(icon){this.node.innerHTML=icon.html;return this},bindTooltip:function(label){this.node.setAttribute('aria-label',label.textContent);return this}}},polyline:function(coords,opts){var svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),poly=document.createElementNS('http://www.w3.org/2000/svg','polyline');svg.style.cssText='position:absolute;width:100%;height:100%;inset:0';poly.setAttribute('fill','none');poly.setAttribute('stroke',opts.color);poly.setAttribute('stroke-width',opts.weight);svg.appendChild(poly);return{coords:coords,node:svg,poly:poly,addTo:function(map){map.node.appendChild(svg);map.layers.push(this);return this}}}};`;
           await command('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:request.url.includes('.js')?'application/javascript':'text/css'},{name:'Access-Control-Allow-Origin',value:'*'}],body:Buffer.from(request.url.includes('.js')?js:'').toString('base64')});
@@ -220,6 +235,12 @@ async function clickText(text) {
         }
         if (!request.url.includes('/api/')) { await command('Fetch.continueRequest',{ requestId }); return; }
         const endpoint = new URL(request.url).pathname;
+        if (invoiceTest && /^\/api\/transactions\/\d+\/invoice$/.test(endpoint)) {
+          const orderId = Number(endpoint.split('/')[3]);
+          const data = { number: `LR-${String(orderId).padStart(6,'0')}`, orderId, createdAt: '2026-11-04T00:00:00Z', updatedAt: '2026-11-04T01:00:00Z', status: 'LaundryReceived', currency: 'PHP', customer: { name: 'Test Invoice Customer' }, shop: { name: 'Test Laundry & Fabric Care', address: '123 Main Street, Naga', phone: '09123456789' }, serviceName: 'Full Service', kilos: '8.25', items: [{ itemName: 'Shirt', quantity: 3 }], subtotal: '215.10', deliveryFee: '30.00', discount: '10.00', total: '235.10', paymentMethod: 'Cash on Delivery' };
+          await command('Fetch.fulfillRequest', { requestId, responseCode: mode==='error' && request.method!=='OPTIONS'?503:200, responseHeaders: [{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'},{name:'Access-Control-Allow-Methods',value:'GET, OPTIONS'}], body: Buffer.from(JSON.stringify(mode==='error'?{success:false,error:{message:'Invoice temporarily unavailable'}}:{success:true,data})).toString('base64') });
+          return;
+        }
         const photoEndpoint = endpoint === '/api/shops/101/photo';
         if(pullTest && request.method==='GET' && /^\/api\/delivery\/orders\/(42|43)\/route-preview$/.test(endpoint)) {
           const pickup=endpoint.includes('/42/');
@@ -248,10 +269,17 @@ async function clickText(text) {
           || servicesTest && ['POST','PUT'].includes(request.method) && /^\/api\/shops\/101\/services(?:\/\d+)?$/.test(endpoint)
           || servicesTest && request.method === 'POST' && endpoint === '/api/shops/101/kilo-prices'
           || approvalTest && request.method === 'PUT' && ['/api/admin/shops/101/review','/api/shops/101/application'].includes(endpoint)
+          || desktopSettingsTest && request.method === 'PUT' && ['/api/users/7','/api/users/7/password','/api/shops/101'].includes(endpoint)
           || applicationTest && request.method === 'POST' && endpoint === '/api/auth/verify-token'
           || approvalTest && request.method === 'POST' && endpoint === '/api/auth/login', 'UI smoke tests must not mutate real records');
         if (mode === 'loading') await pause(2500);
         if (closing) return;
+        if (desktopSettingsTest && request.method === 'PUT') {
+          const body = JSON.parse(request.postData);
+          settingsWrites.push({ endpoint, body });
+          if (endpoint === '/api/users/7') Object.assign(user, body);
+          if (endpoint === '/api/shops/101') Object.assign(shops[0], body);
+        }
         if (manualTimersTest && request.method === 'PUT' && endpoint === '/api/transactions/42/timer') {
           const body=JSON.parse(request.postData);
           assert.deepEqual(Object.keys(body),['phase']);
@@ -311,7 +339,7 @@ async function clickText(text) {
           await command('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' }, { name: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' }], body: Buffer.from(JSON.stringify({ success: true, data })).toString('base64') });
           return;
         }
-        if (shopRequirementsTest && /^\/api\/shops\/101\/documents\/[^/]+$/.test(endpoint)) {
+        if ((shopRequirementsTest || desktopSettingsTest) && /^\/api\/shops\/101\/documents\/[^/]+$/.test(endpoint)) {
           const type = endpoint.split('/').at(-1);
           if (request.method === 'PUT') {
             assert.ok(JSON.parse(request.postData).imageBase64); assert.equal(user.isAdmin, false);
@@ -460,7 +488,7 @@ async function clickText(text) {
           : dispatchTest && endpoint === '/api/delivery/operations' ? { orders: dispatchOrders, riders: [] }
           : riderApplicationTest && (endpoint === '/api/delivery/application' || endpoint === '/api/delivery/applications/12') ? requirementFixture
           : deliveryTest && endpoint === '/api/delivery/orders/42' ? { ...orders[0], weightEvidence: weightRecords, handoff: handoffFixture, workflowStatus: trackingTest ? trackingPhase : bookingTest ? bookingState : handoffFixture ? deliveryJobs[0].order.status : 'Folding', workflowVersion: bookingTest ? bookingVersion : handoffFixture ? deliveryJobs[0].order.version : 8 + weightWrites.length, pickupCode: user.isShopOwner ? undefined : '123456', deliveryCode: user.isShopOwner ? undefined : '345678', collectionCode: user.isShopOwner ? '234567' : undefined, assignments: [{ ...deliveryJobs[0], rider: { name: 'Assigned Rider' } }], events: [{ id: 1, action: 'fold', toStatus: 'Folding', createdAt: new Date().toISOString(), actor: { name: 'Laundry Partner' }, detail: 'Laundry is being folded.' }] }
-          : (deliveryTest || riderApplicationTest || notificationsTest) && endpoint === '/api/delivery/rider' ? { rider: { online: true }, jobs: deliveryJobs }
+          : (deliveryTest || riderApplicationTest || notificationsTest || invoiceTest || brandTest) && endpoint === '/api/delivery/rider' ? { rider: { online: true }, jobs: deliveryJobs }
           : riderApplicationTest && endpoint === '/api/delivery/operations' ? { orders: [], riders: [
             { userId: 12, applicationStatus: 'Pending', active: false, online: false, workload: 0, user: { name: 'Applicant Rider', email: 'rider@example.test', phone: '09123456789' } },
             { userId: 13, applicationStatus: 'Draft', active: false, online: false, canEnable: false, workload: 0, user: { name: 'Draft Rider', email: 'draft@example.test' } },
@@ -486,12 +514,152 @@ async function clickText(text) {
     }
   });
   await command('Page.enable'); await command('Runtime.enable');
-  await command('Fetch.enable',{ patterns:[{urlPattern:'*/api/*'}, ...(trackingTest || pullTest ? [{urlPattern:'*unpkg.com/leaflet*'}] : []), ...(pullTest?[{urlPattern:'https://api.mapbox.com/directions/*'}]:[])] });
+  await command('Fetch.enable',{ patterns:[{urlPattern:'*/api/*'}, ...(trackingTest || pullTest || shopBrowseTest ? [{urlPattern:'*unpkg.com/leaflet*'}] : []), ...(pullTest?[{urlPattern:'https://api.mapbox.com/directions/*'}]:[])] });
+  if(shopBrowseTest) {
+    user.isShopOwner=false; user.isRider=false; user.isAdmin=false;
+    for(const width of [320,390,768,1440]) {
+      await visit('/shops/101',width,'Shop location');
+      await waitFor(`!!document.querySelector('[data-testid="shop-location-map"] .shop-test-marker')`);
+      const marker=await evaluate(`(()=>{const pin=document.querySelector('[data-testid="shop-location-map"] .shop-test-marker');return [Number(pin.dataset.latitude),Number(pin.dataset.longitude)]})()`);
+      assert.deepEqual(marker,[shops[0].latitude,shops[0].longitude],'Shop pin uses saved coordinates');
+      const viewport=await evaluate(`(()=>{const r=document.querySelector('[data-testid="shop-location-map"]').getBoundingClientRect();return {width:r.width,height:r.height}})()`);
+      assert.ok(viewport.width>200 && viewport.height>=240,'Map has usable dimensions');
+      const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,`shop-location-${width}.png`),Buffer.from(shot.data,'base64'));
+      await clickText('Browse services'); await waitFor(`!!document.querySelector('[data-testid="shop-service-options"]')`);
+      assert.equal(await evaluate(`Array.from(document.querySelectorAll('[role="button"]')).some(e=>['Deliver','Pickup'].includes(e.innerText.trim()))`),false,'Unused transport toggle is removed');
+      await evaluate(`document.querySelectorAll('[data-testid="shop-service-options"] [role="radio"]')[0].click()`);
+      await evaluate(`document.querySelectorAll('[data-testid="shop-service-options"] [role="radio"]')[1].click()`);
+      assert.equal(await evaluate(`document.querySelectorAll('[data-testid="shop-service-options"] [aria-checked="true"]').length`),1,'Only one service can be selected');
+      await evaluate(`document.querySelectorAll('[data-testid="shop-service-options"] [role="radio"]')[1].click()`);
+      assert.equal(await evaluate(`document.querySelectorAll('[data-testid="shop-service-options"] [aria-checked="true"]').length`),1,'Selecting the same service retains the radio selection');
+      await clickText('Review Order'); await waitFor('document.body.innerText.includes("Place Order")');
+      const draft=await evaluate(`JSON.parse(sessionStorage.getItem('labaride-draft:user:7')).state`);
+      assert.deepEqual(draft.serviceIds,[2]); assert.equal(draft.service.serviceName,'Wash Only'); assert.equal(Number(draft.service.price),25);
+    }
+    shops[0].latitude=null; shops[0].longitude=null;
+    await visit('/shops/101',390,'This shop has not saved a map location yet.');
+    assert.equal(await evaluate(`!!document.querySelector('[data-testid="shop-location-map"]')`),false,'Missing coordinates never show a guessed map pin');
+    assert.deepEqual(errors,[]);
+    console.log('PASS shop location coordinates, responsive map, missing pins, removed transport toggle, single-service selection and review payload');
+    return;
+  }
+  if (brandTest) {
+    const sidebarMetrics = [];
+    for (const [role,route,color,expected] of [
+      ['shop','/shop/profile','rgb(50, 16, 120)','Shop profile'],
+      ['customer','/home','rgb(36, 87, 173)','Find your laundry care'],
+      ['rider','/rider','rgb(23, 107, 123)','You are online'],
+    ]) {
+      user.isAdmin=false; user.isRider=role==='rider'; user.isShopOwner=role!=='rider';
+      await visit(route,1440,expected,`branding-${role}-desktop`);
+      await waitFor(`!!document.querySelector('[data-testid="brand-mark-${role}"] img')?.complete && document.querySelector('[data-testid="brand-mark-${role}"] img').naturalWidth>0`);
+      assert.ok(await evaluate(`Array.from(document.querySelectorAll('[data-testid="brand-wordmark"]')).filter(e=>e.checkVisibility()).every(e=>getComputedStyle(e).color===${JSON.stringify(color)})`),'Visible wordmarks match the active role');
+      assert.ok(await evaluate(`document.querySelector('[data-testid="brand-mark-${role}"] img').src.includes(${JSON.stringify(role)})`),'Correct supplied logo is loaded');
+      sidebarMetrics.push(await evaluate(`(()=>{const word=document.querySelector('[data-testid="brand-wordmark"]');let bar=word.parentElement;while(bar&&!bar.querySelector('[role="tablist"]'))bar=bar.parentElement;const bounds=bar.getBoundingClientRect(),tabs=Array.from(bar.querySelectorAll('[role="tab"]')).filter(e=>e.checkVisibility()),rect=tabs[0].getBoundingClientRect(),icon=tabs[0].querySelector('svg').getBoundingClientRect(),logo=word.getBoundingClientRect();return {width:bounds.width,itemLeft:rect.left-bounds.left,itemTop:rect.top-bounds.top,itemWidth:rect.width,itemHeight:rect.height,rowGap:tabs[1].getBoundingClientRect().top-rect.top,iconLeft:icon.left-bounds.left,iconWidth:icon.width,logoLeft:logo.left-bounds.left,logoTop:logo.top-bounds.top}})()`));
+      if(role==='rider') {
+        await visit(route,390,'You are online','branding-rider-phone');
+        assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-testid="brand-wordmark"]')).color`),color);
+      }
+    }
+    assert.deepEqual(sidebarMetrics[0],sidebarMetrics[2],'Shop sidebar matches rider sizing, spacing and alignment');
+    assert.deepEqual(sidebarMetrics[1],sidebarMetrics[2],'Customer sidebar matches rider sizing, spacing and alignment');
+    assert.deepEqual(errors,[]);
+    console.log('PASS role branding: supplied logos, loaded images, customer/shop mode colors and teal rider headers on desktop/mobile');
+    return;
+  }
+  if (desktopSettingsTest) {
+    for (const width of [390,1100,1440,1920]) {
+      for (const [route, expected, name] of [
+        ['/shop/profile','Account Information','overview'],
+        ['/shop/profile/account-information','Account Credibility','account'],
+        ['/shop/profile/shop-details','Contact Number *','shop'],
+        ['/shop/profile/security','Current Password','security'],
+        ['/shop/profile/change-password','Confirm New Password','password'],
+        ['/shop/profile/delete-account','Continue','delete'],
+      ]) {
+        await visit(route,width,expected,`shop-settings-${name}-${width}`);
+        assert.equal(await evaluate('!!document.querySelector("[data-testid=desktop-shop-settings]")'),width>=1100,'Desktop settings layout is restricted to desktop web');
+        if(width>=1100) {
+          const tabs=await evaluate(`Array.from(document.querySelectorAll('[data-testid="shop-settings-tabs"] [role="tab"]')).filter(e=>e.checkVisibility()).map(e=>({top:e.getBoundingClientRect().top,selected:e.getAttribute('aria-selected')}))`);
+          assert.equal(tabs.length,4);
+          assert.ok(tabs.every(tab=>Math.abs(tab.top-tabs[0].top)<2),'Settings tabs share a horizontal row');
+          assert.equal(tabs.filter(tab=>tab.selected==='true').length,1,'Exactly one settings tab is selected');
+          if(name==='account') {
+            await waitFor(`document.querySelectorAll('[data-testid="compact-shop-documents"] [data-testid^="shop-document-"]').length===3`);
+            assert.ok(await evaluate(`(()=>{const cards=Array.from(document.querySelectorAll('[data-testid="compact-shop-documents"] [data-testid^="shop-document-"]'));return cards.every(card=>Math.abs(card.getBoundingClientRect().top-cards[0].getBoundingClientRect().top)<2)})()`),'Verification documents share one compact row');
+          }
+        }
+      }
+    }
+    async function input(label, value) {
+      await evaluate(`(()=>{const e=document.querySelector('input[aria-label='+${JSON.stringify(JSON.stringify(label))}+']');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    }
+    await visit('/shop/profile',1440,'Account Information');
+    await clickText('Settings: Account Information'); await waitFor('document.body.innerText.includes("Personal information")');
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="Email Address"]').readOnly`),true,'Email stays read-only');
+    await evaluate(`document.querySelector('[data-testid="shop-document-DTIRegistration"] [role="button"]').click()`);
+    await waitFor(`!!document.querySelector('[data-testid="shop-document-DTIRegistration"] img')`);
+    await clickText('Enlarge document'); await waitFor(`!!document.querySelector('[aria-label="Enlarged private shop document"]')`);
+    await clickText('Close document'); await clickText('Hide private document');
+    await input('Name','Updated Shop Owner'); await input('Contact Number','09998887777');
+    await clickText('Save Changes'); await waitFor('document.body.innerText.includes("Profile updated")');
+    assert.equal(settingsWrites[0].endpoint,'/api/users/7');
+    assert.equal(settingsWrites[0].body.name,'Updated Shop Owner');
+    assert.equal(settingsWrites[0].body.phone,'09998887777');
+    assert.equal(settingsWrites[0].body.email,undefined,'Read-only email is never submitted');
+    await visit('/shop/profile/shop-details',1440,'Business information');
+    await evaluate(`document.querySelector('[data-testid="compact-shop-address"]').scrollIntoView({block:'center'})`);
+    const addressShot=await command('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(artifacts,'shop-settings-address-1440.png'),Buffer.from(addressShot.data,'base64'));
+    await input('Contact Number *','09111222333');
+    await clickText('Save Changes'); await waitFor('document.body.innerText.includes("Shop details saved")');
+    assert.equal(settingsWrites[1].endpoint,'/api/shops/101');
+    assert.equal(settingsWrites[1].body.contactNumber,'09111222333');
+    await clickText('Settings: Security'); await waitFor('document.body.innerText.includes("Current Password")');
+    assert.ok(await evaluate(`(()=>{const e=document.querySelector('[aria-label="Two-factor authentication is not available"]');return e.matches(':disabled')||!!e.querySelector(':disabled')||e.getAttribute('aria-disabled')==='true'})()`),'Unavailable 2FA remains disabled');
+    await input('Current Password','isolated-old-password'); await input('New Password','isolated-new-password');
+    await clickText('Save'); await waitFor('document.body.innerText.includes("Password updated")');
+    assert.equal(settingsWrites[2].endpoint,'/api/users/7/password');
+    assert.deepEqual(settingsWrites[2].body,{currentPassword:'isolated-old-password',newPassword:'isolated-new-password'});
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="New Password"]').value`),'','Password inputs clear after saving');
+    await clickText('Settings: Account Information'); await waitFor('document.body.innerText.includes("Personal information")');
+    await clickText('Delete Account'); await waitFor('document.body.innerText.includes("Permanently delete your account")');
+    await clickText('Cancel'); await waitFor('document.body.innerText.includes("Personal information")');
+    await clickText('Settings: Overview'); await waitFor('document.body.innerText.includes("Workspace & session")');
+    await clickText('Logout'); await waitFor('!!document.querySelector("[role=dialog]")'); await clickText('Cancel');
+    await clickText('Switch to User Mode'); await waitFor('location.pathname==="/profile"');
+    assert.equal(settingsWrites.length,3,'Navigation and cancelled actions do not write data');
+    assert.deepEqual(errors,[]);
+    console.log('PASS desktop shop settings: responsive pages, navigation, account/shop/password saves, read-only email, disabled 2FA, cancelled deletion/logout, and customer mode');
+    return;
+  }
+  if (invoiceTest) {
+    await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.invoiceExports=[];window.open=()=>({opener:null,document:{write:html=>window.invoiceExports.push(html),close:()=>{}}});` });
+    async function checkInvoice(route, width, number, screenshot) {
+      await visit(route,width,'View invoice'); await clickText('View invoice');
+      await waitFor(`document.body.innerText.includes(${JSON.stringify(number)})`);
+      assert.ok(await evaluate('document.body.innerText.includes("PHP 235.10")'));
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Invoice fits viewport');
+      await clickText('Print / Save PDF');
+      assert.ok(await evaluate('window.invoiceExports[0].includes("PHP 235.10")'));
+      if(screenshot) { const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,screenshot+'.png'),Buffer.from(shot.data,'base64')); }
+      await clickText('Close invoice');
+      await waitFor('!document.querySelector("[data-testid=order-invoice]")');
+    }
+    user.isShopOwner=false;
+    for(const width of [320,390,768,1440]) await checkInvoice('/transaction-details?id=42',width,'LR-000042',`invoice-customer-${width}`);
+    user.isShopOwner=true; await checkInvoice('/shop/transactions/shop-transaction?id=42',1440,'LR-000042','invoice-shop-desktop');
+    user.isShopOwner=false;user.isRider=true;
+    await checkInvoice('/rider/jobs',390,'LR-000043','invoice-rider-phone');
+    await visit('/rider/jobs',390,'View invoice'); mode='error'; await clickText('View invoice'); await waitFor('document.body.innerText.includes("Invoice temporarily unavailable")');
+    mode='populated'; await clickText('Retry'); await waitFor('document.body.innerText.includes("LR-000043")');
+    assert.deepEqual(errors,[]);console.log('PASS invoices for customer, shop and rider; four sizes, print output, close and retry');return;
+  }
   if (callTest) await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.copiedPhoneNumbers=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async number=>{window.copiedPhoneNumbers.push(number)}}});` });
   if (scheduleTest) {
     for (const width of [320,390,768,1440]) {
       await visit('/order/101', width, 'Review Order');
-      await evaluate(`document.querySelector('[role="checkbox"]').click()`);
+      await evaluate(`document.querySelector('[data-testid="shop-service-options"] [role="radio"]').click()`);
       await clickText('Review Order');
       await waitFor('document.body.innerText.includes("Place Order")');
       assert.ok(await evaluate('document.body.innerText.includes("Turnaround & Updates")'));
@@ -711,7 +879,10 @@ async function clickText(text) {
   }
   if (shopRequirementsTest) {
     shops[0].requirementsVersion = 1; shops[0].approvalStatus = 'Pending'; user.isShopOwner = false;
-    async function rowClick(type, label) { await evaluate(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');Array.from(row.querySelectorAll('[role=button]')).find(button=>button.innerText.trim()===${JSON.stringify(label)}).click();})()`); await pause(150); }
+    async function rowClick(type, label) {
+      await waitFor(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');return !!row&&Array.from(row.querySelectorAll('[role=button]')).some(button=>button.innerText.trim()===${JSON.stringify(label)})})()`);
+      await evaluate(`(()=>{const row=document.querySelector('[data-testid="shop-document-${type}"]');Array.from(row.querySelectorAll('[role=button]')).find(button=>button.innerText.trim()===${JSON.stringify(label)}).click();})()`); await pause(150);
+    }
     async function uploadShopDocument(type) {
       await rowClick(type, shopDocumentFixture.some(doc => doc.type === type) ? 'Replace document' : 'Upload document');
       await waitFor('!!document.querySelector("input[type=file]")');
@@ -732,6 +903,7 @@ async function clickText(text) {
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
       const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,`shop-documents-admin-${width}.png`),Buffer.from(shot.data,'base64'));
       await clickText('Cancel');
+      await waitFor('!document.querySelector("[aria-modal=true]")');
     }
     await clickText('Approve Shop');
     await rowClick('TinProof','Needs correction');
@@ -766,13 +938,16 @@ async function clickText(text) {
       assert.ok((await evaluate('document.body.innerText')).includes('Calling requires a phone app configured'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
       const shot = await command('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(artifacts, `call-contact-${width}.png`), Buffer.from(shot.data, 'base64'));
-      await clickText('Copy number'); await waitFor('document.body.innerText.includes("Phone number copied.")');
+      await clickText('Copy number'); await waitFor('document.body.innerText.includes("Number copied")');
       assert.equal(await evaluate('window.copiedPhoneNumbers.at(-1)'), '09987654321');
-      await clickText('Close contact');
+      await waitFor('!document.body.innerText.includes("Call contact")');
       await evaluate(`Array.from(document.querySelectorAll('[role=button]')).filter(e=>e.innerText.trim()==='Call')[1].click()`);
       await waitFor('document.body.innerText.includes("Call contact")');
       assert.equal(await evaluate(`document.querySelector('[aria-label="Contact phone number"]').textContent`), '09123456789');
       await clickText('Copy number'); assert.equal(await evaluate('window.copiedPhoneNumbers.at(-1)'), '09123456789');
+      await waitFor('!document.body.innerText.includes("Call contact")');
+      await evaluate(`Array.from(document.querySelectorAll('[role=button]')).filter(e=>e.innerText.trim()==='Call')[1].click()`);
+      await waitFor('document.body.innerText.includes("Call contact")');
       await evaluate(`navigator.clipboard.writeText=async()=>{throw new Error('Clipboard blocked')};document.execCommand=()=>false;`);
       await clickText('Copy number'); await waitFor('document.body.innerText.includes("Select the number above and copy it manually")');
       await clickText('Close contact');
@@ -1175,6 +1350,22 @@ async function clickText(text) {
     }
     await clickText('Add Range'); await waitFor(closed);
     assert.deepEqual(priceRangeWrites[0],{minKilo:4,maxKilo:9,pricePerKilo:25.5});
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/services',width,'Weight-based pricing',`services-catalog-${width}`);
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid=service-weight-pricing]").length'),1,'Weight pricing has one consolidated section');
+      assert.equal(await evaluate('document.querySelectorAll("[data-testid^=service-card-]").length'),3);
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-card-1]")).backgroundColor'),'rgb(255, 255, 255)','Desktop services use neutral cards');
+      assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-accent-3]")).backgroundColor'),'rgb(92, 55, 76)','The saved service color is retained as an accent');
+      assert.ok(await evaluate('document.querySelector("[data-testid=service-weight-pricing]").innerText.includes("4 kg – 9 kg")'),'Saved ranges remain visible');
+    }
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Edit]").click()');
+    await waitFor(editor); await checkFit(false);
+    await input('Price per kilogram','36'); await clickText('Save Changes'); await waitFor(closed);
+    assert.equal(serviceWrites.at(-1).body.price,36,'Desktop editing saves the same service payload');
+    await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Delete]").click()');
+    await waitFor('!!document.querySelector("[data-testid=app-dialog]")');
+    await clickText('Cancel'); await waitFor('!document.querySelector("[data-testid=app-dialog]")');
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=service-card-3]")'),'Cancelling deletion preserves the service');
     await clickText('Add Service'); await waitFor(editor);
     await command('Emulation.setDeviceMetricsOverride',{width:390,height:360,deviceScaleFactor:1,mobile:false});
     await pause(100); await checkFit(false);
@@ -1256,7 +1447,8 @@ async function clickText(text) {
     }
     const navLabels = await evaluate(`Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).map(e=>e.innerText.trim())`);
     assert.ok(navLabels.includes('Dashboard'),'Admin navigation includes Dashboard');
-    assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services','Customers'].includes(label)),'Admin navigation is separate from customer and shop tabs');
+    assert.ok(navLabels.includes('Customers'),'Admin navigation includes customer management');
+    assert.ok(!navLabels.some(label=>['Home','Activities','Profile','Orders','Services'].includes(label)),'Admin navigation is separate from customer and shop tabs');
     assert.equal(await evaluate(`!!document.querySelector('[aria-label="Back"]')`),false,'Admin dashboard has no back arrow');
     assert.ok(!(await evaluate('document.body.innerText')).includes('Customer View'),'No customer-mode switch');
     for (const path of ['/home','/profile','/shop/home','/register-shop']) {
@@ -1422,11 +1614,14 @@ async function clickText(text) {
     assert.deepEqual(workflowWrites.map(body=>body.status),['Accepted','Queued','Processing','Ready','Completed']);
     assert.ok(workflowWrites.every(body=>!body.action),'Status updates retain the original endpoint and payload');
     orders[0].status='Processing';
-    for (const width of [320,390,768]) await visit('/shop/transactions/shop-transaction?id=42',width,'Mark laundry ready',`original-order-processing-${width}`);
+    for (const width of [320,390,768,1440]) {
+      await visit('/shop/transactions/shop-transaction?id=42',width,'Mark laundry ready',`original-order-processing-${width}`);
+      assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'),'Payment method is visible without expanding a card');
+    }
     await clickText('Ready time estimate');
     await waitFor(`!!document.querySelector('[aria-label="Ready date"]')`);
-    await clickText('Order information'); await waitFor('document.body.innerText.includes("Customer Details")');
-    await clickText('Payment information'); assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'));
+    await waitFor('document.body.innerText.includes("Customer Details")');
+    assert.ok(await evaluate('document.body.innerText.includes("Cash on Delivery")'));
     user.isShopOwner=false;
     for (const [status, step] of [['Pending',1],['Accepted',2],['Queued',2],['Processing',3],['Ready',4],['Completed',5],['Cancelled',1]]) {
       orders[0].status=status;
@@ -1441,7 +1636,20 @@ async function clickText(text) {
     return;
   }
   if (orderStepsTest) {
-    for (const width of [320,390,768]) await visit('/shop/transactions/shop-transaction?id=42',width,'Start washing',`order-steps-received-${width}`);
+    for (const width of [320,390,768,1440]) {
+      await visit('/shop/transactions/shop-transaction?id=42',width,'Start washing',`order-steps-received-${width}`);
+      assert.ok(await evaluate('document.body.innerText.toLowerCase().includes("pickup & delivery address")'),'Address is visible without expanding a card');
+      const cards = await evaluate(`Array.from(document.querySelector('[data-testid="order-bento-grid"]').children).map(e=>({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y}))`);
+      assert.equal(Math.abs(cards[0].y-cards[1].y)<2,width>=768,'Bento cards stack on phones and share a row on larger screens');
+      await evaluate(`document.querySelectorAll('[data-testid="order-bento-grid"]')[1].scrollIntoView({block:'start'})`);
+      await pause(150);
+      const bentoShot = await command('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(path.join(artifacts,`order-bento-${width}.png`),Buffer.from(bentoShot.data,'base64'));
+    }
+    await clickText('Cancellation & issues');
+    await waitFor(`!!document.querySelector('[aria-label="Reason or issue details"]')`);
+    assert.equal(workflowWrites.length,0,'Opening issue actions never changes the order');
+    await clickText('Cancellation & issues');
     assert.equal(await evaluate('document.querySelectorAll("[data-testid=order-step-indicator] [role=tab]").length'),5);
     assert.equal(await evaluate(`!!document.querySelector('[aria-label="Measured weight (kg)"]')`),false,'Weight form is initially collapsed');
     assert.equal(await evaluate('document.body.innerText.includes("234567")'),false,'Return code is absent during receipt');
@@ -1464,7 +1672,9 @@ async function clickText(text) {
     await clickText('Start folding'); await clickText('Continue'); await waitFor('document.body.innerText.includes("Mark laundry ready")');
     await clickText('Mark laundry ready'); await clickText('Continue'); await waitFor('document.querySelector("[data-testid=order-step-content]").innerText.includes("Step 4 of 5")');
     await clickText('Handoff confirmation'); await waitFor('document.body.innerText.includes("234567")');
-    await clickText('Order history'); assert.ok(await evaluate('document.body.innerText.includes("Laundry Received")'));
+    const expandHistory = await evaluate(`Array.from(document.querySelectorAll('[role="button"]')).find(e=>/^View all [0-9]+ updates$/.test(e.innerText.trim()))?.innerText`);
+    if(expandHistory) await clickText(expandHistory);
+    assert.ok(await evaluate('document.body.innerText.includes("Laundry Received")'));
     user.isShopOwner=false; orders[0].workflowStatus='Delivered';
     await visit('/order/tracking/42',390,'Confirm receipt','order-steps-customer-return');
     await clickText('Confirm receipt'); await clickText('Continue');
@@ -1565,6 +1775,20 @@ async function clickText(text) {
       const shot=await command('Page.captureScreenshot',{format:'png'});
       fs.writeFileSync(path.join(artifacts,`live-operations-compact-${width}.png`),Buffer.from(shot.data,'base64'));
     }
+    for (const width of [1100,1440,1920]) {
+      await visit('/shop/transactions/shop-live-operations',width,'Workflow moves left to right',`live-operations-desktop-${width}`);
+      const stages = await evaluate(`Array.from(document.querySelectorAll('[data-testid^="live-stage-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.equal(stages.length,5);
+      assert.ok(stages.every(stage=>Math.abs(stage.y-stages[0].y)<2),'Desktop stages align horizontally');
+      assert.ok(stages.every((stage,index)=>!index||stage.x>stages[index-1].x),'Desktop workflow advances left to right');
+      const cards = await evaluate(`Array.from(document.querySelectorAll('[data-testid="live-stage-awaiting"] [data-testid^="live-order-"]')).map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y}})`);
+      assert.ok(cards.length>1);
+      assert.ok(cards.every(card=>Math.abs(card.x-cards[0].x)<2),'Cards share the column width');
+      assert.ok(cards.every((card,index)=>!index||card.y>cards[index-1].y),'Cards stack vertically within a stage');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Desktop board scroll stays inside its container');
+      await evaluate(`document.querySelector('[aria-label="Compact live operations"]').click()`);
+    }
     // Refreshed server state moves the same card and removes completed work.
     orders[0].status = 'Queued';
     orders.find(order => order.id===55).workflowStatus = 'Completed';
@@ -1640,7 +1864,7 @@ async function clickText(text) {
   await visit('/shop/services',390,'Full Service'); await clickText('Add Service'); await waitFor('document.body.innerText.includes("Service Name")');
   await clickText('Cancel');
   await visit('/order/101',390,'Review Order');
-  await evaluate(`document.querySelector('[role="checkbox"]').click()`); await clickText('Review Order'); await waitFor('document.body.innerText.includes("Place Order")');
+  await evaluate(`document.querySelector('[data-testid="shop-service-options"] [role="radio"]').click()`); await clickText('Review Order'); await waitFor('document.body.innerText.includes("Place Order")');
   await visit('/search',390,'Search History');
   await evaluate(`(()=>{const e=document.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'no-such-shop');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await waitFor('document.body.innerText.includes("No laundry shops matched")');

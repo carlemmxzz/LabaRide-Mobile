@@ -1,4 +1,4 @@
-export type InterfaceRole = "customer" | "shop" | "admin";
+export type InterfaceRole = "customer" | "shop" | "rider" | "admin";
 
 const shared = {
   ink: "#202033", white: "#FFFFFF", muted: "#626B7D",
@@ -6,6 +6,11 @@ const shared = {
 };
 
 export const themes = {
+  rider: {
+    ...shared, role: "rider" as const,
+    primary: "#176B7B", hover: "#105466", accent: "#23899B",
+    soft: "#EAF6F7", surface: "#F5FAFB", line: "#DCEBED",
+  },
   admin: {
     ...shared, role: "admin" as const,
     primary: "#0F4766", hover: "#0A344C", accent: "#176489",
@@ -27,6 +32,7 @@ export const themes = {
 // switch into customer mode; ownership alone must never override that choice.
 export function interfaceRole(segments: readonly string[]): InterfaceRole {
   if (segments[0] === "admin") return "admin";
+  if (segments[0] === "rider") return "rider";
   return segments[0] === "shop" ? "shop" : "customer";
 }
 

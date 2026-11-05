@@ -1,17 +1,23 @@
-type NavigationStop = { latitude?: unknown; longitude?: unknown; address?: string };
-
-export function riderNavigationUrl(stop: NavigationStop) {
-  const latitude = coordinate(stop.latitude);
-  const longitude = coordinate(stop.longitude);
-  const pinned = latitude != null && longitude != null && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
-  const destination = pinned ? `${latitude},${longitude}` : stop.address?.trim();
-  if (!destination) throw new Error('This stop has no saved location or address. Ask the customer or shop to update it.');
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving&dir_action=navigate`;
+import { directionsUrl, parseRoadRoute, type RoutePoint } from './job-route';
+export type NavigationStop = { name?: string; latitude?: unknown; longitude?: unknown; address?: string };
+export function navigationPoint(stop: NavigationStop): RoutePoint | null {
+  function coordinate(value: unknown) {
+    if (typeof value !== 'number' && typeof value !== 'string' || typeof value === 'string' && !value.trim()) return NaN;
+    return Number(value);
+  }
+  const latitude = coordinate(stop.latitude), longitude = coordinate(stop.longitude);
+  return Number.isFinite(latitude) && Math.abs(latitude) <= 90 && Number.isFinite(longitude) && Math.abs(longitude) <= 180 ? { latitude, longitude } : null;
 }
-
-function coordinate(value: unknown): number | undefined {
-  if (typeof value !== 'number' && typeof value !== 'string') return undefined;
-  if (typeof value === 'string' && !value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+export function riderDirectionsUrl(origin: RoutePoint, destination: RoutePoint, token: string) {
+  return directionsUrl(origin, destination, token).replace('steps=false', 'steps=true');
+}
+export function parseNavigationRoute(value: unknown) {
+  const route = parseRoadRoute(value);
+  const response = value as { routes: { legs?: { steps?: { distance?: number; maneuver?: { instruction?: string } }[] }[] }[] };
+  const steps = (response.routes[0].legs || []).flatMap(leg => leg.steps || []).flatMap(step => {
+    const instruction = step.maneuver?.instruction;
+    return typeof instruction === 'string' && instruction.trim() && Number.isFinite(step.distance) && step.distance! >= 0
+      ? [{ instruction: instruction.trim(), distanceMeters: step.distance! }] : [];
+  });
+  return { ...route, steps };
 }

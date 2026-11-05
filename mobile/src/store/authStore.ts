@@ -36,10 +36,8 @@ interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
-  isGuest: boolean;
   isLoading: boolean;
   setAuth: (user: User, token: string) => Promise<void>;
-  setGuest: () => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -47,18 +45,14 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   token: null,
-  isGuest: false,
   isLoading: true,
 
   setAuth: async (user, token) => {
     await storage.set("auth_token", token);
     await storage.set("auth_user", JSON.stringify(user));
-    set({ user, token, isGuest: false });
+    set({ user, token });
   },
 
-  setGuest: () => {
-    set({ user: null, token: null, isGuest: true });
-  },
 
   logout: async () => {
     const previous = get();
@@ -73,7 +67,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       ]);
       throw error;
     }
-    set({ user: null, token: null, isGuest: false });
+    set({ user: null, token: null });
   },
 
   checkAuth: async () => {

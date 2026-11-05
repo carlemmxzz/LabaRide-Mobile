@@ -1,3 +1,4 @@
+import { useAuthStore } from "../store/authStore";
 import { Redirect, useLocalSearchParams, useSegments, router } from "expo-router";
 import { flowTarget, legacyShopFlows } from "../navigation/flow-target";
 import {
@@ -39,6 +40,7 @@ import type { Order } from "./data";
 import { useFlowNavigation } from "./data";
 
 export default function DesignFlow() {
+  const user = useAuthStore(state => state.user);
   const segments = useSegments() as string[];
   const { replaceFlow, inShop } = useFlowNavigation();
   const params = useLocalSearchParams<{
@@ -53,6 +55,10 @@ export default function DesignFlow() {
   const { flow: screen, email, reason, method } = params;
   const id = Number(params.id);
   const checkout = params.checkout === "true";
+  // Registration, recovery and onboarding remain public; app flows require sign-in.
+  if (!user && !['how-it-works', 'user-details', 'registration-complete', 'forgot-password', 'verify-email', 'password-reset', 'new-password', 'password-changed', 'account-deleted'].includes(screen)) {
+    return <Redirect href="/(auth)/login" />;
+  }
   const legacyTab = Object.prototype.hasOwnProperty.call(legacyShopFlows, screen)
     ? legacyShopFlows[screen]
     : undefined;

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { Store, UserRound } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api, message } from './data';
 import { useAuthStore } from '../store/authStore';
@@ -30,7 +31,7 @@ export function JobRoutePreview({ orderId }: { orderId: number }) {
       } finally { clearTimeout(timeout); signal.removeEventListener('abort', cancel); }
     }, retry: false, staleTime: 600000, gcTime: 0,
   });
-  const mapData = useMemo(() => ({ origin: endpoints?.origin || null, destination: endpoints?.destination || null, coordinates: route.data?.coordinates || [] }), [endpoints, route.data]);
+  const mapData = useMemo(() => ({ stage: endpoints?.stage || 'Pickup' as const, origin: endpoints?.origin || null, destination: endpoints?.destination || null, coordinates: route.data?.coordinates || [] }), [endpoints, route.data]);
   if (preview.isLoading) return <View style={{ padding: 24, alignItems: 'center', gap: 8 }}><ActivityIndicator accessibilityLabel="Loading route preview" color={palette.primary} /><Txt style={{ fontSize: 12, color: palette.muted }}>Loading saved locations…</Txt></View>;
   if (preview.error || !endpoints) return <View accessibilityRole="alert" style={{ gap: 8 }}><Txt style={{ fontSize: 12, color: palette.danger }}>{message(preview.error) || 'Route preview is unavailable.'}</Txt><Button title="Retry route preview" outline compact onPress={() => { void preview.refetch(); }} /></View>;
   return <View style={{ gap: 8 }}>
@@ -41,6 +42,9 @@ export function JobRoutePreview({ orderId }: { orderId: number }) {
     {ready && token && route.isFetching && !route.data && <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}><ActivityIndicator size="small" color={palette.primary} /><Txt style={{ color: palette.muted, fontSize: 12 }}>Finding the road route…</Txt></View>}
     {!!route.data && ready && <Txt testID="job-route-summary" style={{ color: palette.primary, fontSize: 12, fontWeight: '600' }}>{(route.data.distanceMeters / 1000).toFixed(1)} km · about {Math.max(1, Math.ceil(route.data.durationSeconds / 60))} min driving</Txt>}
     {!!route.error && ready && <View style={{ gap: 6 }}><Txt accessibilityRole="alert" style={{ color: palette.warning, fontSize: 12 }}>{message(route.error)} Only saved pins are shown.</Txt><Button title="Retry road route" compact outline onPress={() => { void route.refetch(); }} /></View>}
-    <View style={{ flexDirection: 'row', gap: 14 }}><Txt style={{ color: '#126B49', fontSize: 11 }}>A · Collect from</Txt><Txt style={{ color: palette.primary, fontSize: 11 }}>B · Destination</Txt></View>
+    <View style={{ flexDirection: 'row', gap: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ padding: 4, borderRadius: 12, backgroundColor: '#2457AD' }}><UserRound size={13} color="white" /></View><Txt style={{ color: '#2457AD', fontSize: 11 }}>Customer</Txt></View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><View style={{ padding: 4, borderRadius: 12, backgroundColor: '#351279' }}><Store size={13} color="white" /></View><Txt style={{ color: '#351279', fontSize: 11 }}>Laundry shop</Txt></View>
+    </View>
   </View>;
 }

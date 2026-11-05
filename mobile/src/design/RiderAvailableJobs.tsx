@@ -1,3 +1,4 @@
+import { toast } from "./toast-service";
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,7 +50,9 @@ export function RiderAvailableJobsDesign() {
   async function availability(online: boolean, position?: { latitude: number; longitude: number }) {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError('');
-    try { await api.put('/delivery/availability', { online, ...position }); await refreshAll(); }
+    try { await api.put('/delivery/availability', { online, ...position }); await refreshAll();
+      if (online) toast.success({ title: "You're online", message: 'You can now receive pickup and delivery jobs.' });
+      else toast.info({ title: "You're offline", message: "You won't get new jobs." }); }
     catch (failure) { setError(message(failure)); }
     finally { pending.current = false; setBusy(false); }
   }
@@ -76,6 +79,7 @@ export function RiderAvailableJobsDesign() {
       setBusy(true);
       await api.put(`/delivery/orders/${job.id}/claim`, { stage: job.stage, expectedVersion: job.workflowVersion });
       await refreshAll();
+      toast.success({ title: 'Job accepted' });
       router.push('/rider/jobs');
     } catch (failure) { setError(message(failure)); await query.refetch(); }
     finally { pending.current = false; setBusy(false); setClaimingId(null); }
@@ -100,11 +104,6 @@ export function RiderAvailableJobsDesign() {
             </View>
             <Button title={board.rider.online ? 'Go offline' : 'Go online'} compact outline={board.rider.online} busy={busy && claimingId === null} disabled={claimingId !== null} onPress={() => { void availability(!board.rider.online); }} />
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Open my active jobs" onPress={() => router.push('/rider/jobs')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 7, borderTopWidth: 1, borderTopColor: palette.line, paddingTop: 8, minHeight: 44 }}>
-            <Bike size={18} color={palette.primary} /><Txt style={{ flex: 1, fontSize: 12, color: palette.muted }}>Active jobs</Txt>
-            <Txt style={{ fontSize: 16, fontWeight: '700', color: palette.primary }}>{board.rider.workload}<Txt style={{ fontSize: 12, color: palette.muted }}> / {board.rider.capacity}</Txt></Txt><ChevronRight size={17} color={palette.primary} />
-          </Pressable>
           {board.rider.online && board.rider.workload >= board.rider.capacity && <Txt style={{ color: palette.warning, fontSize: 12 }}>Your job slots are full. Finish a job in My jobs to claim another.</Txt>}
         </Card>
         {board.rider.online && <>

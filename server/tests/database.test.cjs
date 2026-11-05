@@ -29,11 +29,12 @@ test('copied Supabase URLs receive secure defaults and retain their credentials'
     assert.equal(url.port, '5432');
     assert.equal(url.searchParams.get('sslmode'), 'require');
     assert.equal(url.searchParams.get('connect_timeout'), '30');
+    assert.equal(url.searchParams.get('connection_limit'), '3');
   }
 });
 
 test('runtime and migration URLs remain independently configurable', () => {
-  const runtime = base + '?sslmode=require&connect_timeout=45';
+  const runtime = base + '?sslmode=require&connect_timeout=45&connection_limit=2';
   const direct = 'postgresql://postgres:test@db.testproject.supabase.co:5432/postgres?sslmode=require&connect_timeout=60';
   const result = envSchema.parse(configuration(runtime, direct));
   assert.equal(result.DATABASE_URL, runtime);
@@ -87,4 +88,26 @@ test('API database failures return a controlled response without raw Prisma deta
     assert.ok(!logs.join('\n').includes('private-password'));
     assert.ok(!logs.join('\n').includes('secret-jwt'));
   } finally { console.error = originalError; }
+});
+
+test('uncoded Prisma startup failures report safe actionable causes', () => {
+  for (const [detail, expected] of [
+    ['FATAL: Tenant or user not found', /tenant or user/],
+    ['FATAL: password authentication failed', /authentication failed/],
+    ['MaxClientsInSessionMode: max clients reached', /connection limit/],
+    ['FATAL: (EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15', /connection limit/],
+    ['connect ENETUNREACH', /unreachable/],
+    ['connect ETIMEDOUT', /timed out/],
+    ['unrecognized initialization failure', /could not initialize/],
+  ]) {
+    const failure = describeDatabaseError({
+      name: 'PrismaClientInitializationError',
+      message: detail + ' postgresql://private-user:private-password@private-host/postgres',
+    });
+    assert.equal(failure.status, 503);
+    assert.equal(failure.apiCode, 'DATABASE_UNAVAILABLE');
+    assert.match(failure.message, expected);
+    assert.ok(!JSON.stringify(failure).includes('private-password'));
+    assert.ok(!JSON.stringify(failure).includes('private-host'));
+  }
 });

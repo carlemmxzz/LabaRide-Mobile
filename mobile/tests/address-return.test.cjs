@@ -26,7 +26,7 @@ function harness() {
     postal_code: '4400', country: 'Philippines', address_type: 'Home', latitude: 13.62, longitude: 123.19 };
   const saved = { ...profile, address_line_1: '88 Saved Street' };
   const draft = { address: null, set: value => Object.assign(draft, value) };
-  const context = { exports: {}, React, ...addressModule.exports,
+  const context = { exports: {}, React, toast: { info() {} }, ...addressModule.exports,
     usePalette: () => ({}), styles: {}, useProfile: () => ({ data: profile }),
     useLaundryDraft: () => draft, useQuery: () => ({ data: [saved] }),
     useAuthStore: selector => { const auth = { user: profile, token: 'test', setAuth: async () => {} }; return selector ? selector(auth) : auth; },

@@ -33,6 +33,27 @@ function boot(saved = new Map(), native = false) {
 const service = { id: 9, serviceName: 'Full Service', price: 215, packageKilos: 8 };
 const shop = { id: 5, shopName: 'Test Laundry', openingTime: '08:00', closingTime: '18:00', services: [service] };
 
+test('starting an order keeps only the chosen service even if multiple IDs are supplied', async () => {
+  const app = boot();
+  await app.restoreLaundryDraft('user:1');
+  app.useLaundryDraft.getState().start(shop, service, [9, 10]);
+  assert.equal(app.useLaundryDraft.getState().serviceIds.join(','), '9');
+});
+
+test('legacy multi-service drafts restore one canonical service and its own price', async () => {
+  const saved = new Map([['labaride-draft:user:1', JSON.stringify({ version: 1, state: {
+    shop: { ...shop, services: [service, { id: 10, serviceName: 'Dry', price: 55 }] },
+    service: { ...service, serviceName: 'Full Service, Dry', price: 270 }, serviceIds: [9, 10], kilos: '8',
+  } })]]);
+  const app = boot(saved);
+  await app.restoreLaundryDraft('user:1');
+  const draft = app.useLaundryDraft.getState();
+  assert.equal(draft.serviceIds.join(','), '9');
+  assert.equal(draft.service.serviceName, 'Full Service');
+  assert.equal(draft.service.price, 215);
+  assert.equal(draft.kilos, '8');
+});
+
 test('browser refresh restores the entire reviewed order without persisting submission state', async () => {
   const app = boot();
   await app.restoreLaundryDraft('user:1');
@@ -69,15 +90,20 @@ test('saved baskets are isolated between accounts and restored when the same acc
   assert.equal(app.useLaundryDraft.getState().shop.id, 5);
 });
 
-test('a guest basket survives login when the account has no saved basket', async () => {
+test('signing out clears the in-memory basket without carrying it into another account', async () => {
   const app = boot();
-  await app.restoreLaundryDraft('guest');
+  await app.restoreLaundryDraft('user:1');
   app.useLaundryDraft.getState().start(shop, service, [9]);
   app.useLaundryDraft.getState().set({ kilos: '4' });
+  await app.restoreLaundryDraft(null);
+  assert.equal(app.useLaundryDraft.getState().shop, null);
+  app.useLaundryDraft.getState().set({ kilos: '99' });
+  assert.equal(app.saved.has('labaride-draft:signed-out'), false);
+  await app.restoreLaundryDraft('user:2');
+  assert.equal(app.useLaundryDraft.getState().service, null);
+  assert.equal(app.useLaundryDraft.getState().kilos, '');
   await app.restoreLaundryDraft('user:1');
   assert.equal(app.useLaundryDraft.getState().kilos, '4');
-  assert.equal(app.saved.has('labaride-draft:guest'), false);
-  assert.ok(app.saved.has('labaride-draft:user:1'));
 });
 
 test('completing an order clears the saved basket across refreshes', async () => {

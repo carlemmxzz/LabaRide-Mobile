@@ -13,7 +13,7 @@ test('tracking map updates genuine reported coordinates in srcdoc without resett
   const parent = { location: { origin: 'https://labaride.test' } };
   const elements = Object.fromEntries(['status', 'recenter', 'map'].map(id => [id, { style: {} }]));
   const context = { parent, location: { origin: 'null' }, document: { getElementById: id => elements[id], createElement: () => ({}), head: { appendChild: node => node.onload() } }, setTimeout: callback => callback(),
-    L: { map: () => ({ setView() { return this; }, fitBounds() { fitted++; }, invalidateSize() {}, removeLayer() {} }), tileLayer: () => ({ addTo() { return this; }, on() {} }), divIcon: options => options,
+    L: { map: () => ({ attributionControl: { setPrefix() {} }, setView() { return this; }, fitBounds() { fitted++; }, invalidateSize() {}, removeLayer() {} }), tileLayer: () => ({ addTo() { return this; }, on() {} }), divIcon: options => options,
       marker: position => ({ position, addTo() { return this; }, setLatLng(position) { this.position = position; return this; }, setIcon() { return this; }, bindTooltip() { return this; }, getLatLng() { return this.position; } }) },
   };
   context.window = context; context.addEventListener = (name, callback) => { listener = callback; };

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, useSegments } from "expo-router";
 import { showDialog } from "./dialog-service";
+import { toast } from "./toast-service";
+import { localNotificationMutation } from "./notification-toast-state";
 import apiClient from "../api/client";
 import { useAuthStore } from "../store/authStore";
 
@@ -116,10 +118,10 @@ export const api = {
     return (await apiClient.get<unknown, Envelope<T>>(path)).data;
   },
   async post<T>(path: string, body: unknown) {
-    return (await apiClient.post<unknown, Envelope<T>>(path, body)).data;
+    return localNotificationMutation(useAuthStore.getState().user?.id, path, body, async () => (await apiClient.post<unknown, Envelope<T>>(path, body)).data);
   },
-  async put<T>(path: string, body: unknown) {
-    return (await apiClient.put<unknown, Envelope<T>>(path, body)).data;
+  async put<T>(path: string, body: unknown, notificationOrderId?: number) {
+    return localNotificationMutation(useAuthStore.getState().user?.id, path, body, async () => (await apiClient.put<unknown, Envelope<T>>(path, body)).data, notificationOrderId);
   },
   async delete(path: string) {
     return apiClient.delete(path);
@@ -143,7 +145,7 @@ export function confirmAction(title: string, text: string, options: { confirmLab
   return showDialog({ title, message: text, kind: "confirm", ...options });
 }
 export function fail(error: unknown) {
-  notify("Something went wrong", message(error));
+  toast.error({ title: "Something went wrong", message: message(error) });
 }
 export function unavailable(feature: string) {
   notify(

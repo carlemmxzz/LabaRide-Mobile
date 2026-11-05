@@ -3,6 +3,7 @@ import { interfaceRole, rolePalette } from "../src/design/theme-tokens";
 import { useSegments } from "expo-router";
 import { PanelAccess } from "../src/navigation/PanelAccess";
 import { AppDialogHost } from "../src/design/AppDialogHost";
+import { ToastHost } from "../src/design/ToastHost";
 import { useEffect, useRef, useState } from "react";
 import { restoreLaundryDraft } from "../src/design/store";
 import { BlurTargetView as ExpoBlurTargetView } from "expo-blur";
@@ -31,8 +32,8 @@ export default function RootLayout() {
   const blurTarget = useRef<View | null>(null);
   const segments = useSegments();
   const { checkAuth, isLoading, user } = useAuthStore();
-  const draftOwner = user ? `user:${user.id}` : "guest";
-  const [restoredDraftOwner, setRestoredDraftOwner] = useState<string | null>(null);
+  const draftOwner = user ? `user:${user.id}` : null;
+  const [restoredDraftOwner, setRestoredDraftOwner] = useState<string | null | undefined>(undefined);
   const [fontsLoaded, fontError] = useFonts({
     Inter: Inter_400Regular,
     "Inter-Medium": Inter_500Medium,
@@ -95,6 +96,7 @@ export default function RootLayout() {
         <InterfaceTheme role={interfaceRole(segments)}>
           <BlurTargetView ref={blurTarget} style={{ flex: 1 }}><PanelAccess /></BlurTargetView>
           <AppDialogHost blurTarget={blurTarget} />
+          <ToastHost />
         </InterfaceTheme>
       </QueryClientProvider>
     </SafeAreaProvider>

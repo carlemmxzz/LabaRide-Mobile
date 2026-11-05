@@ -80,6 +80,7 @@ export class AuthController {
       if (!isValidPassword) {
         return sendError(res, 'Invalid credentials', 'UNAUTHORIZED', 401);
       }
+      if (user.isBlocked) return sendError(res, 'Your account has been blocked for a policy violation. Contact support to request a review.', 'ACCOUNT_BLOCKED', 403);
 
       // Generate token
       const token = jwt.sign(

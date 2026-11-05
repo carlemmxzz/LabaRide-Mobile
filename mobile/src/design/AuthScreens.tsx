@@ -1,3 +1,5 @@
+import { toast } from "./toast-service";
+import { BrandMark } from './BrandMark';
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -11,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { ArrowRight, Bike, UserRound, CheckCircle2, WashingMachine, Sparkles } from "lucide-react-native";
+import { ArrowRight, Bike, CheckCircle2, WashingMachine, Sparkles } from "lucide-react-native";
 import { type Href, router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
@@ -109,21 +111,19 @@ export function OnboardingScreen({ how = false }: { how?: boolean }) {
 }
 export function SplashDesign() {
   const palette = usePalette();
-  const { user, isGuest } = useAuthStore();
+  const { user } = useAuthStore();
   const proceed = () =>
     router.replace(
       user
         ? user.isAdmin ? "/admin" : user.isRider ? "/rider" : user.riderApplicationStatus ? "/rider-application" as Href : user.isShopOwner
           ? "/shop/home"
           : "/(user)/home"
-        : isGuest
-          ? "/(user)/home"
-          : "/(onboarding)/welcome",
+        : "/(onboarding)/welcome",
     );
   useEffect(() => {
     const timer = setTimeout(proceed, 2000);
     return () => clearTimeout(timer);
-  }, [user, isGuest]);
+  }, [user]);
   return (
     <Pressable accessibilityRole="button"
       onPress={proceed}
@@ -159,7 +159,7 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { setAuth, setGuest } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const cache = useQueryClient();
   async function login() {
     if (busy) return;
@@ -175,7 +175,7 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
       await setAuth(result.user, result.token);
       router.replace(result.user.isAdmin ? "/admin" : result.user.isRider ? "/rider" : result.user.riderApplicationStatus ? "/rider-application" as Href : result.user.isShopOwner ? "/shop/home" : "/(user)/home");
     } catch (error) {
-      fail(error);
+      toast.error({ title: "Couldn't sign in", message: message(error) });
     } finally {
       setBusy(false);
     }
@@ -202,7 +202,7 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
               <View style={{ flex: 1, minWidth: 0, padding: wide ? 42 : 24 }}>
               <View accessible accessibilityLabel="LabaRide ? Laundry pickup and delivery" style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 8 }}>
                 <View style={{ width: 76, height: 76, borderRadius: 20, backgroundColor: palette.soft, borderWidth: 1, borderColor: palette.line, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Asset name="blacklogo.png" size={64} />
+                  <BrandMark size={64} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ color: palette.primary, fontSize: wide ? 32 : 28, fontWeight: "700", letterSpacing: -0.8 }}>LabaRide</Txt>
@@ -286,21 +286,6 @@ export function LoginDesign({ initialSignup = false, initialRecovery = false }: 
                 <View style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, backgroundColor: '#E9EFFF', alignItems: 'center', justifyContent: 'center' }}><Bike size={21} color="#2457AD" /></View>
                 <View style={{ flex: 1, minWidth: 0, gap: 3 }}><Txt style={{ color: '#2457AD', fontSize: 14, fontWeight: '600' }}>Apply as a Rider</Txt><Txt style={{ color: '#626B7D', fontSize: 12, lineHeight: 18 }}>Join our pickup and delivery team</Txt></View>
                 <ArrowRight size={18} color="#2457AD" style={{ flexShrink: 0 }} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Continue as Guest"
-                style={({ pressed }) => ({ minHeight: 44, borderRadius: 12,
-                  backgroundColor: pressed ? "#F5F7FC" : "white",
-                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10 })}
-                onPress={() => {
-                  cache.clear();
-                  setGuest();
-                  router.replace("/(user)/home");
-                }}
-              >
-                <UserRound size={17} color="#626B7D" />
-                <Txt style={{ color: "#626B7D", fontSize: 14, fontWeight: "500" }}>Continue as Guest</Txt>
               </Pressable>
               </View>
               </>}

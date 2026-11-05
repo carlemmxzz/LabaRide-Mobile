@@ -63,19 +63,27 @@ const storage = createJSONStorage<DraftData>(() => Platform.OS === "web" ? {
 } : AsyncStorage);
 
 function draftData(state: Partial<DraftData>): DraftData {
-  return Object.fromEntries(Object.keys(emptyDraft).map(key => [key,
+  const data = Object.fromEntries(Object.keys(emptyDraft).map(key => [key,
     state[key as keyof DraftData] ?? emptyDraft[key as keyof DraftData],
   ])) as unknown as DraftData;
+  const ids = Array.isArray(data.serviceIds) ? data.serviceIds : [];
+  const selectedId = ids[0] ?? data.service?.id;
+  const service = data.shop?.services?.find(item => item.id === selectedId)
+    || (ids.length <= 1 && data.service?.id === selectedId ? data.service : null);
+  return { ...data, service, serviceIds: service ? [service.id] : [] };
 }
+
+// Signed-out sessions cannot persist an order basket.
+const noDraftStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 export const useLaundryDraft = create<Draft>()(persist((set, get) => ({
   ...emptyDraft,
   set: (value) => set(value),
-  start: (shop, service, serviceIds) =>
+  start: (shop, service, _serviceIds) =>
     set({
       shop,
       service,
-      serviceIds,
+      serviceIds: [service.id],
       counts: {},
       notes: "",
       kilos: "",
@@ -87,24 +95,28 @@ export const useLaundryDraft = create<Draft>()(persist((set, get) => ({
     }),
   clearOrder: () => set({ ...emptyDraft, searchHistory: get().searchHistory }),
 }), {
-  name: "labaride-draft:guest",
+  name: "labaride-draft:signed-out",
   version: 1,
-  storage,
+  storage: noDraftStorage,
   skipHydration: true,
   partialize: state => draftData(state),
   merge: (saved, current) => ({ ...current, ...draftData((saved || {}) as Partial<DraftData>) }),
 }));
 
-let restoredOwner: string | null = null;
+let restoredOwner: string | null | undefined;
 let restoration = Promise.resolve();
 
 // Serializing restores prevents a slow native read for one account from
 // overwriting a more recent login. The root layout waits before showing routes.
-export function restoreLaundryDraft(owner: string) {
+export function restoreLaundryDraft(owner: string | null) {
   const pending = restoration.then(async () => {
     if (restoredOwner === owner) return;
-    const guestDraft = restoredOwner === "guest" && owner !== "guest"
-      ? draftData(useLaundryDraft.getState()) : null;
+    if (owner === null) {
+      useLaundryDraft.persist.setOptions({ name: 'labaride-draft:signed-out', storage: noDraftStorage });
+      useLaundryDraft.setState({ ...emptyDraft });
+      restoredOwner = null;
+      return;
+    }
     let failed = false;
     useLaundryDraft.persist.setOptions({
       name: `labaride-draft:${owner}`,
@@ -119,10 +131,6 @@ export function restoreLaundryDraft(owner: string) {
         getItem: () => null, setItem: () => {}, removeItem: () => {},
       } });
       useLaundryDraft.setState({ ...emptyDraft });
-    }
-    if (!failed && guestDraft?.service && !useLaundryDraft.getState().service) {
-      useLaundryDraft.setState(guestDraft);
-      try { await storage?.removeItem("labaride-draft:guest"); } catch { /* The signed-in draft is already restored. */ }
     }
     restoredOwner = owner;
   });
