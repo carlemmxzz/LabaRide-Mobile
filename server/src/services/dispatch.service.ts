@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { addressSchema } from '../validators/address.validator';
 import { serviceProcessingTimes, serviceTimingSelection } from '../utils/processing-timing';
+import { orderNotificationCopy } from '../utils/order-notification-copy';
 
 // Collection and return addresses can differ. Legacy orders use their saved address.
 export function collectionPoint<T extends { collectionMethod?: string; collectionAddress?: unknown }>(order: T) {
@@ -49,15 +50,15 @@ export async function lockOrder(tx: Prisma.TransactionClient, id: number) {
 export async function recordEvent(tx: Prisma.TransactionClient, order: { id: number; userId: number; shop: { userId: number }; workflowStatus: string | null }, actorId: number, action: string, to: string, detail?: string, riderId?: number) {
   await tx.orderEvent.create({ data: { transactionId: order.id, actorId, action, fromStatus: order.workflowStatus, toStatus: to, detail } });
   const admins = await tx.user.findMany({ where: { isAdmin: true }, select: { id: true } });
-  const title = action === 'JobClaimed' ? `${to.startsWith('Pickup') ? 'Pickup' : 'Delivery'} job claimed by rider` : action === 'WeightAndPriceUpdated' ? 'Measured weight and scale photo updated' : action === 'HandoffArrived' ? 'Rider arrived — confirm the handover in order details' : action === 'HandoffReleased' ? 'Handover confirmed — rider can confirm receipt' : to.replace(/([a-z])([A-Z])/g, '$1 $2');
-  const message = `Order #${order.id}: ${title}.${detail ? ` ${detail}` : ''}`;
   const recipients = [
     { userId: order.userId, audience: 'customer', shopMode: false },
     { userId: order.shop.userId, audience: 'partner', shopMode: true },
     ...admins.map(user => ({ userId: user.id, audience: 'admin', shopMode: false })),
     ...(riderId ? [{ userId: riderId, audience: 'rider', shopMode: false }] : []),
   ];
-  await tx.notification.createMany({ data: recipients.map(user => ({ ...user, transactionId: order.id, title, message })) });
+  await tx.notification.createMany({ data: recipients.map(user => ({ ...user, transactionId: order.id,
+    ...orderNotificationCopy({ audience: user.audience, orderId: order.id, action, status: to, detail }),
+  })) });
 }
 
 export async function changeState(tx: Prisma.TransactionClient, order: Awaited<ReturnType<typeof lockOrder>>, actorId: number, action: string, to: string, detail?: string, riderId?: number) {

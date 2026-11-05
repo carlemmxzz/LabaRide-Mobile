@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { serviceProcessingTimes, serviceTimingSelection } from '../utils/processing-timing';
+import { orderNotificationCopy } from '../utils/order-notification-copy';
 
 function reject(message: string, statusCode = 409): never {
   throw Object.assign(new Error(message), { statusCode, code: statusCode === 403 ? 'FORBIDDEN' : 'TIMER_CONFLICT' });
@@ -15,9 +16,9 @@ export async function startProcessingTimer(tx: Prisma.TransactionClient, id: num
   if (order.status !== 'Processing') reject('Start processing before starting a laundry timer');
   if (phase === 'washing' ? order.washingStartedAt : order.dryingStartedAt) return { order, started: false };
   if (phase === 'washing' && order.dryingStartedAt) reject('Drying has already started');
-  if (phase === 'drying' && !order.washingStartedAt) reject('Start washing before starting drying');
   const services = await tx.shopService.findMany({ where: { shopId: order.shopId }, select: serviceTimingSelection });
   const configured = serviceProcessingTimes(order.serviceName, services);
+  if (phase === 'drying' && !order.washingStartedAt && (order.washingMinutes ?? configured.washingMinutes)) reject('Start washing before starting drying');
   const times = phase === 'washing' ? configured : { washingMinutes: order.washingMinutes, dryingMinutes: order.dryingMinutes ?? configured.dryingMinutes };
   const duration = phase === 'washing' ? times.washingMinutes : times.dryingMinutes;
   if (!duration || duration <= 0) reject(`Set the service’s ${phase} duration in Services before starting this timer`);
@@ -27,8 +28,8 @@ export async function startProcessingTimer(tx: Prisma.TransactionClient, id: num
     ...(phase === 'washing' ? { washingStartedAt: now } : { dryingStartedAt: now }),
   } });
   await tx.notification.createMany({ data: [
-    { userId: order.userId, transactionId: id, shopMode: false, title: `${phase === 'washing' ? 'Washing' : 'Drying'} started`, message: `Order #${id}: the shop started ${phase}.` },
-    { userId: ownerId, transactionId: id, shopMode: true, title: `${phase === 'washing' ? 'Washing' : 'Drying'} started`, message: `Order #${id}: ${phase} timer started.` },
+    { userId: order.userId, transactionId: id, shopMode: false, ...orderNotificationCopy({audience:'customer',orderId:id,action:'',status:phase==='washing'?'Washing':'Drying'}) },
+    { userId: ownerId, transactionId: id, shopMode: true, ...orderNotificationCopy({audience:'partner',orderId:id,action:'',status:phase==='washing'?'Washing':'Drying'}) },
   ] });
   return { order: saved, started: true };
 }

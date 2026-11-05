@@ -1,9 +1,10 @@
-export const shopTabs = ["home", "transactions", "services", "customers", "profile"] as const;
+export const shopTabs = ["home", "transactions", "operations", "services", "customers", "profile"] as const;
 export type ShopTab = (typeof shopTabs)[number];
 
 const shopFlowPaths = {
   home: "/shop/home/[flow]",
   transactions: "/shop/transactions/[flow]",
+  operations: "/shop/operations/[flow]",
   services: "/shop/services/[flow]",
   customers: "/shop/customers/[flow]",
   profile: "/shop/profile/[flow]",

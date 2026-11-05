@@ -13,6 +13,7 @@ import { clearedRiderLocation } from '../services/rider-tracking.service';
 import { prepareShopPhoto } from '../utils/shop-photo';
 import { claimableStatuses, dispatchDistance } from '../services/dispatch.service';
 import { documentMeta, requirementsMissing } from '../utils/rider-requirements';
+import { withUserPhoto } from '../utils/user-profile';
 import type { Server } from 'socket.io';
 
 const idSchema = z.coerce.number().int().positive();
@@ -20,7 +21,7 @@ const noteSchema = z.string().trim().min(5).max(1000);
 const actor = (req: AuthRequest) => req.user!.userId;
 function emit(req: AuthRequest) { (req.app.get('io') as Server | undefined)?.emit('operations_update', {}); }
 const riderSelect = { id: true, name: true, email: true, phone: true } as const;
-const orderInclude = { weightEvidence: { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], select: { id: true, kilos: true, totalAmount: true, note: true, createdAt: true, actor: { select: { name: true } } } }, shop: { include: { services: true, kiloPrices: true } }, assignments: { select: { id: true, transactionId: true, riderId: true, stage: true, resumeStatus: true, status: true, expiresAt: true, createdAt: true, updatedAt: true, rider: { select: { id: true, name: true } } } }, events: { orderBy: { createdAt: 'asc' as const }, include: { actor: { select: { name: true } } } } };
+const orderInclude = { weightEvidence: { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], select: { id: true, kilos: true, totalAmount: true, note: true, createdAt: true, actor: { select: { name: true } } } }, shop: { include: { services: true, kiloPrices: true } }, assignments: { select: { id: true, transactionId: true, riderId: true, stage: true, resumeStatus: true, status: true, expiresAt: true, createdAt: true, updatedAt: true, rider: { select: { id: true, name: true, phone: true, photo: { select: { updatedAt: true } } } } } }, events: { orderBy: { createdAt: 'asc' as const }, include: { actor: { select: { name: true } } } } };
 
 export class DeliveryController {
   static async routePreview(req: AuthRequest, res: Response, next: NextFunction) {
@@ -280,7 +281,8 @@ export class DeliveryController {
       const partner = order.shop.userId === actor(req);
       if (!req.user!.isAdmin && !customer && !partner) fail('Order access denied', 403);
       const { pickupCode, collectionCode, deliveryCode, ...safe } = order;
-      return sendSuccess(res, { ...withProcessingTiming(safe, order.shop.services, order.events), handoff: handoffState(order, order.events), pickupCode: customer ? pickupCode : undefined, deliveryCode: customer ? deliveryCode : undefined, collectionCode: partner ? collectionCode : undefined });
+      const assignments = order.assignments.map(job => ({ ...job, rider: job.rider ? { ...withUserPhoto(job.rider), phone: job.status === 'Accepted' ? job.rider.phone : undefined } : undefined }));
+      return sendSuccess(res, { ...withProcessingTiming(safe, order.shop.services, order.events), assignments, handoff: handoffState(order, order.events), pickupCode: customer ? pickupCode : undefined, deliveryCode: customer ? deliveryCode : undefined, collectionCode: partner ? collectionCode : undefined });
     } catch (error) { next(error); }
   }
 
@@ -308,9 +310,7 @@ export class DeliveryController {
     try {
       const id = idSchema.parse(req.params.id);
       const body = z.object({ action: z.string(), expectedVersion: z.number().int().nonnegative(), code: z.string().regex(/^\d{6}$/, 'Enter the six-digit handoff code.').optional(), note: z.string().trim().max(1000, 'Keep the explanation within 1,000 characters.').optional(), kilos: z.number().positive().max(10000).optional(), estimatedReadyAt: z.string().datetime().optional() }).superRefine((body, context) => {
-        if (body.action === 'confirmBooking') {
-          if (!body.note) context.addIssue({ code: z.ZodIssueCode.custom, path: ['note'], message: 'Enter an acceptance explanation before confirming this booking.' });
-        } else if (body.note !== undefined && body.note.length < 5) {
+        if (body.action !== 'confirmBooking' && body.note !== undefined && body.note.length < 5) {
           context.addIssue({ code: z.ZodIssueCode.custom, path: ['note'], message: 'Enter at least 5 characters for the notes or reason.' });
         }
       }).parse(req.body);
@@ -354,7 +354,7 @@ export class DeliveryController {
           return;
         } else if (body.action === 'confirmBooking') {
           if (!partner) fail('Only this laundry partner can confirm a booking', 403);
-          if (order.workflowStatus !== 'BookingPending' || !body.note) fail('Provide an acceptance explanation for this pending booking');
+          if (order.workflowStatus !== 'BookingPending') fail('Only pending bookings can be confirmed');
           to = order.collectionMethod === 'Dropoff' ? 'AtPartner' : 'PickupQueued';
         } else if (partnerTransitions[body.action]) {
           if (!partner) fail('Only this laundry partner can update laundry progress', 403);

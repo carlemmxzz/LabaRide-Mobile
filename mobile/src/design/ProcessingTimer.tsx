@@ -18,13 +18,13 @@ export function ProcessingTimer({ order, compact = false, actions }: { order: Pr
     return () => { clearInterval(interval); subscription.remove(); };
   }, [active, order.processingStartedAt, order.washingStartedAt, order.dryingStartedAt]);
   const timers = processingTimers(order, now);
-  if (!timers) return null;
+  if (!timers || timers.phases.every(phase => phase.seconds === null)) return null;
   return <View testID="processing-timer" style={{ gap: compact ? 5 : 8, backgroundColor: palette.soft, borderRadius: 10, padding: compact ? 8 : 12 }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
       <Timer size={14} color={palette.primary} />
       <Txt style={{ fontSize: 11, color: palette.primary, fontWeight: "700" }}>Wash & dry timers</Txt>
     </View>
-    {timers.phases.map(phase => <View key={phase.name} style={{ gap: 3 }}>
+    {timers.phases.filter(phase => phase.seconds !== null).map(phase => <View key={phase.name} style={{ gap: 3 }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
         <Txt style={{ fontSize: 12, fontWeight: "600" }}>{phase.name}</Txt>
         <Txt style={{ fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"], color: phase.state === "elapsed" ? "#9A3412" : phase.state === "running" ? palette.primary : palette.muted }}>{timerPhaseText(phase)}</Txt>
@@ -34,7 +34,7 @@ export function ProcessingTimer({ order, compact = false, actions }: { order: Pr
       </View>
       {actions && !order.workflowStatus && (phase.name === "Wash" ? !order.washingStartedAt && !order.dryingStartedAt : !order.dryingStartedAt) && <Button
         title={phase.name === "Wash" ? "Start washing" : "Start drying"} compact outline busy={actions.busy}
-        disabled={actions.busy || phase.name === "Dry" && !order.washingStartedAt}
+        disabled={actions.busy || phase.name === "Dry" && !order.washingStartedAt && Number(order.washingMinutes) > 0}
         onPress={() => actions.onStart(phase.name === "Wash" ? "washing" : "drying")} />}
     </View>)}
     {!compact && <Txt style={{ fontSize: 11, color: palette.muted }}>The shop starts each timer manually. Time elapsed does not change the order status.</Txt>}

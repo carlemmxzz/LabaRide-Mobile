@@ -78,8 +78,10 @@ import { useLogout } from "./useLogout";
 import { DeliveryOrderDesign } from './DeliveryScreens';
 import { DashboardAnalytics } from './DashboardAnalytics';
 import { LiveOperationsButton } from './LiveOperationsButton';
+import { DeclineOrderModal } from './DeclineOrderModal';
 import { normalizeServiceColor, serviceCardColors, serviceColorOptions, serviceColorTaken } from './service-colors';
 import WeightRangeSlider from './WeightRangeSlider';
+import { ServiceTimerSlider } from './ServiceTimerSlider';
 
 export function RegisterShopDesign() {
   const [values, setValues] = useState<Record<string, string>>({
@@ -337,11 +339,10 @@ export function ShopHomeDesign() {
   const owned = useOwnedShop();
   const orders = useOrders(true);
   const list = orders.data || [];
-  return <Screen title="Dashboard" back={false} right={<IconButton label="Notifications" onPress={() => go("shop-notifications")}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton>}>
+  return <Screen title="Dashboard" back={false} right={<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>{owned.data && <LiveOperationsButton />}<IconButton label="Notifications" onPress={() => go("shop-notifications")}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton></View>}>
     <View style={styles.stack}>
       <View><Txt style={styles.title}>{owned.data?.shopName || "Your shop overview"}</Txt><Txt style={styles.muted}>Your shop’s performance at a glance.</Txt></View>
       <QueryState loading={owned.isLoading || orders.isLoading} error={owned.error || orders.error} retry={() => { owned.refetch(); orders.refetch(); }} />
-      {owned.data && <LiveOperationsButton />}
       {owned.data && <DashboardAnalytics shopId={owned.data.id} />}
       {!owned.isLoading && !orders.isLoading && !owned.error && !orders.error && owned.data && <>
         <Card><Section title="Recent orders" action="View all" onPress={() => router.push("/shop/transactions")} /><TransactionsTable dashboard orders={list.slice(0, 4).map(order => ({ ...order, status: shopOrderStatus(order) }))} /></Card>
@@ -370,7 +371,7 @@ export function ShopOrderDetailsDesign({
   const result = useOrders(true);
   const order = result.data?.find((o) => o.id === id);
   const [busy, setBusy] = useState(false);
-  const [acceptanceExplanation, setAcceptanceExplanation] = useState("");
+  const [declining, setDeclining] = useState(false);
   const timerInFlight = useRef(false);
   const cache = useQueryClient();
   const [estimateDate, setEstimateDate] = useState("");
@@ -398,7 +399,6 @@ export function ShopOrderDetailsDesign({
     try {
       await api.put(`/transactions/${id}/status`, {
         status, ...extra,
-        ...(status === "Accepted" ? { acceptanceExplanation: acceptanceExplanation.trim() } : {}),
       });
       await cache.invalidateQueries({ queryKey: ["shop-orders"] });
       await cache.invalidateQueries({ queryKey: ["shop-analytics"] });
@@ -424,21 +424,17 @@ export function ShopOrderDetailsDesign({
       </Screen>
     );
   if (order.workflowStatus) return <DeliveryOrderDesign id={id} partner />;
-  return <OriginalOrderDetails order={order} partner
+  return <><OriginalOrderDetails order={order} partner
     timerActions={{ onStart: phase => { void startTimer(phase); }, busy }}
-    right={order.status === "Pending" ? <Button title="Decline" compact outline onPress={() => go("decline-order", { id: String(id) })} /> : undefined}
-    bookingFields={<View style={{ gap: 8 }}>
-      <Field label="Acceptance explanation (required)" placeholder="Let the customer know why you can accept and what to expect."
-        value={acceptanceExplanation} onChangeText={setAcceptanceExplanation} multiline maxLength={500} editable={!busy} />
-      <Txt style={styles.muted}>This message will be shared with the customer when you accept.</Txt>
-    </View>}
-    primaryAction={!["Completed", "Cancelled"].includes(order.status) ? <Button
+    primaryAction={!["Completed", "Cancelled"].includes(order.status) ? <View style={{ flexDirection: "row", gap: 10 }}>
+      {order.status === "Pending" && <Button title="Decline" outline color={palette.danger} disabled={busy} onPress={() => setDeclining(true)} style={{ flex: 1 }} />}
+      <Button style={{ flex: 1 }}
       title={({ Pending: "Accept order", Accepted: "Confirm laundry received", Queued: "Start processing", Processing: "Mark laundry ready", Ready: order.deliveryType === "Deliver" ? "Confirm delivered to customer" : "Confirm collected by customer" } as Record<string, string>)[order.status]}
-      busy={busy} disabled={order.status === "Pending" && !acceptanceExplanation.trim()} onPress={async () => {
+      busy={busy} onPress={async () => {
         const next = ({ Pending: "Accepted", Accepted: "Queued", Queued: "Processing", Processing: "Ready", Ready: "Completed" } as Record<string, Order["status"]>)[order.status];
         const prompts: Record<string, string> = { Accepted: "Accept this order? Processing will begin only when you select Start processing.", Queued: "Has the laundry arrived at the shop? It will enter your queue.", Processing: "Start processing now? The processing start time will be recorded.", Ready: "Is the laundry finished and ready for return?", Completed: order.deliveryType === "Deliver" ? "Has the customer received the return delivery?" : "Has the customer collected their finished laundry?" };
         if (await confirmAction("Update laundry status", prompts[next], { confirmLabel: "Confirm" })) await update(next);
-      }} /> : undefined}
+      }} /></View> : undefined}
     confirmPickupAction={order.status === "Accepted" && order.requestedPickupAt && !order.confirmedPickupAt ? <Button title="Confirm requested laundry pickup" outline busy={busy} onPress={() => update(order.status, { confirmPickup: true })} /> : undefined}
     estimateEditor={["Queued", "Processing"].includes(order.status) ? <View style={{ gap: 10 }}>
       <Txt style={styles.muted}>Base the estimate on your queue. All times are Philippine time.</Txt>
@@ -452,7 +448,11 @@ export function ShopOrderDetailsDesign({
         void update(order.status, { estimatedReadyAt: new Date(timestamp).toISOString(), estimateReason });
       }} />
     </View> : undefined}
-  />;
+  />{declining && <DeclineOrderModal id={id} onClose={() => setDeclining(false)} onDecline={async reason => {
+    await api.put(`/transactions/${id}/status`, { status: "Cancelled", notes: reason });
+    await Promise.all(["shop-orders", "shop-analytics", "user-orders", "notifications"].map(key => cache.invalidateQueries({ queryKey: [key] })));
+    toast.success({ title: "Order declined" });
+  }} />}</>;
 }
 export function DeclineOrderDesign({
   id,
@@ -796,8 +796,8 @@ export function ServicesDesign() {
           serviceName: item && "serviceName" in item ? item.serviceName : "",
           price: item && "price" in item ? String(item.price) : "",
           packageKilos: item && "packageKilos" in item && item.packageKilos != null ? String(item.packageKilos) : "",
-          washingMinutes: item && "washingMinutes" in item && item.washingMinutes != null ? String(item.washingMinutes) : "",
-          dryingMinutes: item && "dryingMinutes" in item && item.dryingMinutes != null ? String(item.dryingMinutes) : "",
+          washingMinutes: item ? ("washingMinutes" in item && Number(item.washingMinutes) > 0 ? String(item.washingMinutes) : "") : "45",
+          dryingMinutes: item ? ("dryingMinutes" in item && Number(item.dryingMinutes) > 0 ? String(item.dryingMinutes) : "") : "60",
         }
         : {
           minKilo: item && "minKilo" in item ? String(item.minKilo) : "1",
@@ -812,15 +812,12 @@ export function ServicesDesign() {
   function setDecimalValue(key: string, value: string) {
     if (/^\d*(?:\.\d*)?$/.test(value)) setValues(current => ({ ...current, [key]: value }));
   }
-  function setWholeNumberValue(key: string, value: string) {
-    if (/^\d*$/.test(value)) setValues(current => ({ ...current, [key]: value }));
-  }
   async function save() {
     if (!shop || busy) return;
     if (editing && dialog === "price") return unavailable("Edit price range");
     if (dialog === "service" && (!color || serviceColorTaken(shop.services || [], color, editing?.id)))
       return setError("Choose a color that is not already used by another service.");
-    const activeValues = Object.entries(values).filter(([key]) => key !== "packageKilos" || packagePricing);
+    const activeValues = Object.entries(values).filter(([key]) => !["washingMinutes", "dryingMinutes"].includes(key) && (key !== "packageKilos" || packagePricing));
     if (
       activeValues.some(([, value]) => !value.trim()) ||
       activeValues.some(
@@ -836,8 +833,8 @@ export function ServicesDesign() {
       (Number(values.packageKilos) <= 0 || Number(values.packageKilos) > 99999999.99 || Number(Number(values.packageKilos).toFixed(2)) !== Number(values.packageKilos)))
       return setError("Enter a package weight above 0 kg with up to two decimal places, no higher than 99,999,999.99.");
     if (dialog === "service" && [values.washingMinutes, values.dryingMinutes].some(value =>
-      !Number.isInteger(Number(value)) || Number(value) <= 0 || Number(value) > 10080))
-      return setError("Enter washing and drying times from 1 to 10,080 minutes.");
+      value !== "" && (!Number.isInteger(Number(value)) || Number(value) <= 0 || Number(value) > 10080)))
+      return setError("Choose a valid timer duration or No value.");
     if (dialog === "price" && Number(values.maxKilo) <= Number(values.minKilo))
       return setError("Maximum weight must be greater than minimum weight.");
     setBusy(true);
@@ -851,8 +848,8 @@ export function ServicesDesign() {
             serviceName: values.serviceName.trim(),
             price: Number(values.price),
             packageKilos: packagePricing ? Number(values.packageKilos) : null,
-            washingMinutes: Number(values.washingMinutes),
-            dryingMinutes: Number(values.dryingMinutes),
+            washingMinutes: values.washingMinutes ? Number(values.washingMinutes) : null,
+            dryingMinutes: values.dryingMinutes ? Number(values.dryingMinutes) : null,
             color,
           }
           : {
@@ -1057,17 +1054,10 @@ export function ServicesDesign() {
                       {Number(values.packageKilos) > 0 ? "Each load covers up to " + values.packageKilos + " kg. " : ""}
                       Extra weight counts as another load.
                     </Txt>}
-                    <View style={{ flexDirection: "row", gap: 12 }}>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Field compact label="Standard washing time" placeholder="e.g. 30" suffix="min"
-                          value={values.washingMinutes} keyboardType="number-pad" inputMode="numeric" editable={!busy}
-                          onChangeText={value => setWholeNumberValue("washingMinutes", value)} />
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Field compact label="Standard drying time" placeholder="e.g. 45" suffix="min"
-                          value={values.dryingMinutes} keyboardType="number-pad" inputMode="numeric" editable={!busy}
-                          onChangeText={value => setWholeNumberValue("dryingMinutes", value)} />
-                      </View>
+                    <View style={{ gap: 16 }}>
+                      <Txt style={{ color: palette.muted, fontSize: 12 }}>Timers are optional. Slide fully left to choose No value.</Txt>
+                      <ServiceTimerSlider label="Washing time (optional)" value={values.washingMinutes} maximum={210} disabled={busy} onChange={value => setValues(current => ({ ...current, washingMinutes: value }))} />
+                      <ServiceTimerSlider label="Drying time (optional)" value={values.dryingMinutes} maximum={240} disabled={busy} onChange={value => setValues(current => ({ ...current, dryingMinutes: value }))} />
                     </View>
                     <View style={{ gap: 4 }}>
                       <Txt style={{ fontSize: 12, fontWeight: "500" }}>Service color</Txt>

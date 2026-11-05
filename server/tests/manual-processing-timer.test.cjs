@@ -83,3 +83,11 @@ test('unconfigured durations give an actionable error without starting, and clie
   for(const body of [{phase:'other'},{phase:'washing',washingStartedAt:'2020-01-01T00:00:00Z'},{phase:'drying',duration:1}])
     assert.equal(startProcessingTimerSchema.safeParse({params:{id:'64'},body}).success,false);
 });
+
+test('a drying-only service starts its timer without a washing timer', async()=>{
+  const f=fixture(); f.services[0].washingMinutes=null;
+  assert.equal((await f.start('drying')).error,undefined);
+  assert.equal(f.row.washingStartedAt,null);
+  assert.ok(f.row.dryingStartedAt instanceof Date);
+  assert.equal(f.row.dryingMinutes,45);
+});

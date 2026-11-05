@@ -27,6 +27,9 @@ import { deliveryDay } from './delivery-slots';
 import type { AddressData } from './address';
 import PickerField from './PickerField';
 import { timeInputValue } from './form-values';
+import { DeclineOrderModal } from './DeclineOrderModal';
+import { returnDeliveryUpdate } from './return-delivery';
+import { AssignedRiderCard, type AssignedRider } from './AssignedRiderCard';
 
 type Handoff = { kind: 'pickup' | 'collection' | 'delivery'; arrived: boolean; released: boolean };
 
@@ -40,7 +43,7 @@ function HandoffPanel({ handoff, rider = false, busy, send }: { handoff: Handoff
   </View>;
 }
 
-type Job = { id: number; transactionId: number; riderId: number; stage: string; status: string; expiresAt: string; createdAt: string; updatedAt: string; rider?: { name: string }; order: { handoff?: Handoff; id: number; status: string; serviceName: string; kiloAmount: string; scheduledDate: string | null; scheduledTime: string | null; requestedPickupAt?: string | null; totalAmount?: string; paymentMethod?: string; customer: { name?: string; phone?: string; address: string; latitude?: number; longitude?: number; instructions?: string; notes?: string; accessCode?: string }; shop: { name: string; address: string; phone?: string; latitude?: number; longitude?: number } } };
+type Job = AssignedRider & { id: number; transactionId: number; stage: string; status: string; expiresAt: string; createdAt: string; updatedAt: string; order: { handoff?: Handoff; id: number; status: string; serviceName: string; kiloAmount: string; scheduledDate: string | null; scheduledTime: string | null; requestedPickupAt?: string | null; totalAmount?: string; paymentMethod?: string; customer: { name?: string; phone?: string; address: string; latitude?: number; longitude?: number; instructions?: string; notes?: string; accessCode?: string }; shop: { name: string; address: string; phone?: string; latitude?: number; longitude?: number } } };
 type Rider = { userId: number; active: boolean; online: boolean; applicationStatus?: string; reviewReason?: string; canEnable?: boolean; approvalMissing?: string[]; workload: number; user: { name: string; email: string; phone?: string } };
 type RiderOptions = { stage: 'Pickup' | 'Delivery'; workflowVersion: number; origin: { source: 'customer' | 'shop'; name: string; address: string; coordinatesAvailable: boolean }; riders: { userId: number; name: string; workload: number; distance: number | null }[] };
 type Event = { id: number; action: string; toStatus: string; detail?: string; createdAt: string; actor: { name: string } };
@@ -59,7 +62,7 @@ const riderActions: Record<string, { action: string; title: string; code?: boole
   OutForDelivery: { action: 'delivered', title: 'Confirm delivery', code: true },
 };
 const partnerActions: Record<string, { action: string; title: string }> = {
-  BookingPending: { action: 'confirmBooking', title: 'Confirm booking' },
+  BookingPending: { action: 'confirmBooking', title: 'Accept order' },
   AtPartner: { action: 'receive', title: 'Confirm laundry received' },
   LaundryReceived: { action: 'wash', title: 'Start washing' },
   Washing: { action: 'dry', title: 'Start drying' },
@@ -112,10 +115,13 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
   const [estimateTime, setEstimateTime] = useState('');
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [issueNote, setIssueNote] = useState('');
+  const [declining, setDeclining] = useState(false);
   const progress = orderDetailProgress(order?.workflowStatus || 'BookingPending', order?.events);
   const viewedStep = selectedStep ?? progress.current;
   const currentView = viewedStep === progress.current;
   const closed = !!order && ['Completed', 'Cancelled'].includes(order.workflowStatus);
+  const returnUpdate = order ? returnDeliveryUpdate(order, partner) : null;
+  const returnRider = order?.assignments.find(job => job.stage === 'Delivery' && job.status === 'Accepted');
   useEffect(() => { setSelectedStep(null); }, [id, order?.workflowStatus]);
   useEffect(() => { setNote(''); setIssueNote(''); command.setError(''); }, [id]);
   useEffect(() => {
@@ -134,7 +140,6 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
   async function action(name: string, explanation = note.trim()) {
     if (!order) return;
     command.setError('');
-    if (name === 'confirmBooking' && !explanation) { command.setError('Enter an acceptance explanation before confirming this booking.'); return; }
     if (['cancel', 'issue', 'resolveIssue'].includes(name) && !explanation) { command.setError('Enter a reason or explanation before continuing.'); return; }
     if (name !== 'confirmBooking' && explanation && explanation.length < 5) { command.setError('Enter at least 5 characters for the notes or reason.'); return; }
     let estimatedReadyAt: string | undefined;
@@ -182,19 +187,19 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
             {!!order.estimateReason && <Txt style={styles.muted}>{order.estimateReason}</Txt>}
           </View>}
           {viewedStep === 3 && <>
-            <Txt>{order.deliveryType === 'Deliver' ? 'Return delivery to the customer.' : 'Customer collection at the shop.'}</Txt>
+            {returnUpdate ? <><Txt style={{ fontWeight: '600', color: palette.primary }}>{returnUpdate.title}</Txt><Txt>{returnUpdate.description}</Txt></> : <Txt>{order.deliveryType === 'Deliver' ? 'Return delivery to the customer.' : 'Customer collection at the shop.'}</Txt>}
             {!!order.readyAt && <Txt style={styles.muted}>Laundry ready: {stepStamp(order.readyAt)}</Txt>}
+            {order.deliveryType === 'Deliver' && returnRider && <AssignedRiderCard key={returnRider.riderId} assignment={returnRider} />}
           </>}
           {viewedStep === 4 && progress.complete && <>
             <Txt style={{ fontWeight: '600', color: palette.primary }}>Clean laundry received by the customer.</Txt>
             {!!order.completedAt && <Txt style={styles.muted}>Completed: {stepStamp(order.completedAt)}</Txt>}
           </>}
           {currentView && !closed && <>
-            {partner && order.workflowStatus === 'BookingPending' && <>
-              <Field label="Acceptance explanation" value={note} onChangeText={value => { setNote(value); command.setError(''); }} placeholder="For example: We can accept this booking." editable={!command.busy} multiline maxLength={1000} />
-              <Txt style={{ fontSize: 12, color: palette.muted }}>An explanation is required to confirm the booking.</Txt>
-            </>}
-            {next && <Button title={next.title} busy={command.busy} onPress={() => action(next.action)} />}
+            {next && <View style={{ flexDirection: 'row', gap: 10 }}>
+              {partner && order.workflowStatus === 'BookingPending' && <Button title="Decline" outline color={palette.danger} disabled={command.busy} onPress={() => setDeclining(true)} style={{ flex: 1 }} />}
+              <Button title={next.title} busy={command.busy} onPress={() => action(next.action)} style={{ flex: 1 }} />
+            </View>}
             {(partner || next) && order.workflowStatus !== 'BookingPending' && <OrderDisclosure title="Add a note">
               <Field label="Notes / issue details" value={note} onChangeText={value => { setNote(value); command.setError(''); }} placeholder="Optional note for the next update" editable={!command.busy} multiline maxLength={1000} />
             </OrderDisclosure>}
@@ -249,12 +254,17 @@ export function DeliveryOrderDesign({ id, partner = false }: { id: number; partn
       </OrderBentoCard>
       {!closed && (partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && <OrderBentoCard title="Cancellation & issues" subtitle="Report a problem or manage this booking" kind="issues" expandable>
         <Field label="Reason or issue details" value={issueNote} onChangeText={value => { setIssueNote(value); command.setError(''); }} placeholder="Explain the cancellation or issue" editable={!command.busy} multiline maxLength={1000} />
-        {(partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && <Button title="Cancel booking" outline color={palette.danger} busy={command.busy} onPress={() => action('cancel', issueNote.trim())} />}
+        {(partner || user?.isAdmin || order.workflowStatus === 'BookingPending') && !(partner && order.workflowStatus === 'BookingPending') && <Button title="Cancel booking" outline color={palette.danger} busy={command.busy} onPress={() => action('cancel', issueNote.trim())} />}
         {(partner || user?.isAdmin) && <Button title="Report delivery issue" outline busy={command.busy} onPress={() => action('issue', issueNote.trim())} />}
         {user?.isAdmin && <Button title="Resolve reported issue" outline busy={command.busy} onPress={() => action('resolveIssue', issueNote.trim())} />}
       </OrderBentoCard>}
       </OrderBentoGrid>
     </View>}
+    {declining && order && <DeclineOrderModal id={id} onClose={() => setDeclining(false)} onDecline={async reason => {
+      const saved = await command.send(`/delivery/orders/${id}/action`, { action: 'cancel', expectedVersion: order.workflowVersion, note: reason });
+      if (!saved) throw new Error('Unable to decline the order. Please try again.');
+      toast.success({ title: 'Order declined' });
+    }} />}
   </Screen>;
 }
 
