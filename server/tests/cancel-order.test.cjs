@@ -109,7 +109,8 @@ test('shop status updates cannot revive a cancelled order or overwrite a simulta
   assert.equal(accepted.row.processingStartedAt, undefined);
   assert.equal(accepted.row.notes, 'Shop acceptance: We have capacity today.');
   assert.equal(accepted.notifications.length, 2);
-  assert.ok(accepted.notifications[0].message.includes('We have capacity today.'));
+  assert.match(accepted.notifications[0].message,/accepted your laundry booking/);
+  assert.notEqual(accepted.notifications[0].message,accepted.notifications[1].message);
 });
 
 test('receipt and processing are separate, timestamps start on explicit action and cannot reset', async () => {
@@ -158,10 +159,11 @@ test('shop can confirm requested pickup only after accepting the order', async (
   assert.equal((await invoke(options)).res.code, 409);
 });
 
-test('acceptance requires a nonblank explanation of at most 500 characters', async () => {
+test('acceptance needs no explanation and validates optional legacy explanations', async () => {
   const missing = await invoke({ method: 'updateStatus', userId: 2, body: { status: 'Accepted' } });
-  assert.equal(missing.res.code, 400);
-  assert.equal(missing.writes, 0);
+  assert.equal(missing.res.code, 200);
+  assert.equal(missing.row.status, 'Accepted');
+  assert.ok(!missing.notifications[0].message.includes('undefined'));
   for (const acceptanceExplanation of ['   ', 'x'.repeat(501)]) {
     const invalid = await invoke({ method: 'updateStatus', userId: 2, body: { status: 'Accepted', acceptanceExplanation } });
     assert.equal(invalid.error.name, 'ZodError');

@@ -7,9 +7,33 @@ const compiled = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../src/design/processing-timer.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS },
 }).outputText)(compiled, compiled.exports);
-const { processingTimers, timerClock, timerPhaseText } = compiled.exports;
+const { processingTimers, timerClock, timerPhaseText, activeMachinePhase, timerPercent } = compiled.exports;
 const start = Date.parse('2026-10-30T01:00:00Z');
 const order = { status: 'Processing', washingMinutes: 30, dryingMinutes: 45, processingStartedAt: new Date(start).toISOString() };
+
+test('timer percentage never rounds to 100 while time remains', () => {
+  const snapshot = { ...order, workflowStatus: 'Washing' };
+  const almostDone = processingTimers(snapshot, start + (30 * 60 - 4) * 1000).phases[0];
+  assert.equal(almostDone.seconds, 4);
+  assert.equal(timerPercent(almostDone), 99);
+  const elapsed = processingTimers(snapshot, start + 30 * 60000).phases[0];
+  assert.equal(timerPercent(elapsed), 100);
+  assert.equal(elapsed.state, 'elapsed');
+  assert.equal(snapshot.workflowStatus, 'Washing', 'Timer expiry does not mark laundry complete');
+});
+
+test('live activities only include a started machine cycle', () => {
+  const now = start + 5 * 60000;
+  assert.equal(activeMachinePhase(order, now), null, 'Processing alone is not a machine start');
+  assert.equal(activeMachinePhase({ ...order, workflowStatus: 'Drying' }, now), null, 'Drying needs its own timestamp');
+  assert.equal(activeMachinePhase({ ...order, workflowStatus: 'Folding' }, now), null);
+  assert.equal(activeMachinePhase({ ...order, washingStartedAt: new Date(start).toISOString() }, now).name, 'Wash');
+  assert.equal(activeMachinePhase({ ...order, workflowStatus: 'Washing' }, now).name, 'Wash');
+  const drying = { ...order, dryingStartedAt: new Date(start).toISOString() };
+  assert.equal(activeMachinePhase(drying, now).name, 'Dry');
+  assert.equal(activeMachinePhase({ ...drying, status: 'Cancelled' }, now), null);
+  assert.equal(activeMachinePhase(drying, start + 50 * 60000).state, 'elapsed', 'Expiry waits for the shop update');
+});
 
 test('shop and customer countdowns derive from the same timestamps, including reopening and background gaps', () => {
   const snapshot = { ...order, workflowStatus: 'Washing' };

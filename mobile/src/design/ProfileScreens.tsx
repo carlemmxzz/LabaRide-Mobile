@@ -45,8 +45,10 @@ import { ProfilePhotoControl } from "./ProfilePhotoControl";
 import { useLogout } from "./useLogout";
 import { ShopAccountCredibility } from './ShopRequirements';
 import { DesktopShopSettings, SettingsSaveBar, SettingsSection, useDesktopShopSettings } from './DesktopShopSettings';
+import { CustomerProfileFrame, ProfileFact, useDesktopCustomerProfile } from './CustomerProfileFrame';
 
 export function UserProfileDesign() {
+  const desktop = useDesktopCustomerProfile();
   const logout = useLogout();
   const palette = usePalette();
   const { go } = useFlowNavigation();
@@ -54,6 +56,35 @@ export function UserProfileDesign() {
   const profile = useProfile();
   const owned = useOwnedShop();
   const data = profile.data || user;
+  if (desktop && user) return <CustomerProfileFrame active="overview" title="Your profile" description="Your personal details, saved addresses, and account preferences in one place.">
+    <QueryState loading={profile.isLoading} error={profile.error} retry={() => profile.refetch()} />
+    <Card style={{ padding: 22, flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+      <ProfilePhotoControl userId={user.id} photoUrl={data?.photoUrl} size={88} />
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}><Txt style={{ fontSize: 22, lineHeight: 30, fontWeight: '700' }}>{data?.name}</Txt><Txt selectable style={{ fontSize: 13, color: palette.muted }}>{data?.email}</Txt><Txt style={{ fontSize: 11, color: palette.muted }}>Customer account · #{user.id}</Txt></View>
+      <Button title="Edit profile" compact outline icon={<Pencil size={15} color={palette.primary} />} onPress={() => go('edit-profile')} />
+    </Card>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 18 }}>
+      <View style={{ flex: 1.8, minWidth: 0, gap: 16 }}>
+        <SettingsSection title="Personal details" description="The information linked to your customer account.">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 22 }}>
+            <ProfileFact label="Contact number" value={profile.data?.phone || 'Not provided'} />
+            <ProfileFact label="Birthdate" value={profile.data?.birthdate ? new Date(profile.data.birthdate.slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : 'Not provided'} />
+            <ProfileFact label="Gender" value={profile.data?.gender || 'Not provided'} />
+            <ProfileFact label="Primary address" value={address(profile.data) || 'No address saved'} wide />
+          </View>
+        </SettingsSection>
+        <Card style={{ padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16 }}><View style={{ flex: 1, gap: 3 }}><Txt style={{ fontSize: 15, fontWeight: '600' }}>Shop workspace</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>{owned.data?.approvalStatus === 'Approved' ? 'Manage your laundry business using your shop account.' : 'Open a laundry shop or check your existing application.'}</Txt></View><Button title={owned.data?.approvalStatus === 'Approved' ? 'Switch to Shop Mode' : owned.data ? 'Shop Application Status' : 'Apply to Open a Shop'} compact outline onPress={() => owned.data?.approvalStatus === 'Approved' ? router.replace('/shop/profile') : go('register-shop')} /></Card>
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+        <SettingsSection title="Account" description="Quick access to your customer account.">
+          <MenuRow title="Addresses" detail="Manage your saved locations" asset="locationblue.png" onPress={() => go('addresses')} />
+          <MenuRow title="Transactions" detail="View your order history" asset="transaction.png" onPress={() => go('history')} />
+          <MenuRow title="Change Password" detail="Update your sign-in password" onPress={() => go('change-password')} />
+        </SettingsSection>
+        <Card style={{ padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}><View style={{ flex: 1, gap: 2 }}><Txt style={{ fontSize: 14, fontWeight: '600' }}>Session</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>Sign out of this account.</Txt></View><Button title="Logout" compact outline color={palette.danger} onPress={logout} /></Card>
+      </View>
+    </View>
+  </CustomerProfileFrame>;
   return (
     <Screen background={palette.surface} padded={false}>
       {!user ? (
@@ -147,6 +178,7 @@ function ProfileAction({ title, asset, onPress }: { title: string; asset: "locat
 }
 export function EditProfileDesign({ account = false }: { account?: boolean }) {
   const desktop = useDesktopShopSettings();
+  const customerDesktop = useDesktopCustomerProfile() && !account;
   const palette = usePalette();
   const { go } = useFlowNavigation();
   const profile = useProfile();
@@ -155,8 +187,10 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [editKey, setEditKey] = useState<string | null>(null);
+  const initializedProfile = useRef<number | null>(null);
   useEffect(() => {
-    if (profile.data)
+    if (profile.data && (!customerDesktop || initializedProfile.current !== profile.data.id)) {
+      initializedProfile.current = profile.data.id;
       setValues(
         Object.fromEntries(
           Object.entries(profile.data).map(([key, value]) => [
@@ -171,7 +205,8 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
           ]),
         ),
       );
-  }, [profile.data]);
+    }
+  }, [profile.data, customerDesktop]);
   async function save() {
     if (!auth.user) return;
     if (values.name?.trim().length < 2)
@@ -202,13 +237,32 @@ export function EditProfileDesign({ account = false }: { account?: boolean }) {
       await auth.setAuth(user, auth.token!);
       cache.setQueryData(["user", user.id], user);
       toast.success({ title: "Profile updated", message: "Your changes are saved." });
-      router.back();
+      if (customerDesktop) router.replace('/(user)/profile'); else router.back();
     } catch (error) {
       fail(error);
     } finally {
       setBusy(false);
     }
   }
+  if (customerDesktop) return <CustomerProfileFrame active="edit" title="Personal information" description="Keep your contact information and personal details up to date.">
+    <QueryState loading={profile.isLoading} error={profile.error} retry={() => profile.refetch()} />
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 18 }}>
+      <View style={{ flex: 1.8, minWidth: 0 }}><SettingsSection title="Profile details" description="Changes apply to your customer account.">
+        {auth.user && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, borderBottomWidth: 1, borderBottomColor: palette.line, paddingBottom: 16 }}><ProfilePhotoControl userId={auth.user.id} photoUrl={profile.data?.photoUrl} size={80} /><View style={{ flex: 1, gap: 4 }}><Txt style={{ fontSize: 14, fontWeight: '600' }}>Profile photo</Txt><Txt style={{ fontSize: 12, color: palette.muted }}>Use the photo menu to change or remove your picture.</Txt></View></View>}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          {[{ key: 'name', label: 'Name' }, { key: 'phone', label: 'Contact Number' }, { key: 'email', label: 'Email Address' }].map(field => <View key={field.key} style={{ flexBasis: '46%', flexGrow: 1, minWidth: 0 }}><Field compact label={field.label} value={values[field.key] || ''} editable={field.key !== 'email' && !busy} keyboardType={field.key === 'phone' ? 'phone-pad' : field.key === 'email' ? 'email-address' : 'default'} onChangeText={value => setValues(current => ({ ...current, [field.key]: value }))} />{field.key === 'email' && <Txt style={{ fontSize: 11, color: palette.muted, marginTop: 4 }}>Your sign-in email is read-only.</Txt>}</View>)}
+          <View style={{ flexBasis: '46%', flexGrow: 1, minWidth: 0 }}><PickerField label="Birthdate" mode="date" value={values.birthdate || ''} maximumDate={new Date()} onChange={birthdate => setValues(current => ({ ...current, birthdate }))} /></View>
+          <View style={{ flexBasis: '46%', flexGrow: 1, minWidth: 0 }}><Field compact label="Gender" placeholder="Optional" value={values.gender || ''} editable={!busy} onChangeText={gender => setValues(current => ({ ...current, gender }))} /></View>
+        </View>
+        <SettingsSaveBar onSave={save} busy={busy} />
+      </SettingsSection></View>
+      <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+        <SettingsSection title="Primary address" description="Your default location for pickup and delivery."><Txt style={{ fontSize: 13, lineHeight: 22 }}>{address(profile.data) || 'No address saved'}</Txt><Button title="Edit address" compact outline onPress={() => { useLaundryDraft.getState().set({ address: null }); go('confirm-location'); }} /></SettingsSection>
+        <SettingsSection title="Account access"><Button title="Change Password" compact outline onPress={() => go('change-password')} /><Button title="Delete Account" compact outline color={palette.danger} onPress={() => go('delete-account')} /></SettingsSection>
+        <SettingsSection title="Connected accounts" description="Account linking is currently unavailable."><View style={{ flexDirection: 'row', gap: 12 }}><Txt style={{ flex: 1, fontSize: 12, color: palette.muted }}>Google · Unavailable</Txt><Txt style={{ flex: 1, fontSize: 12, color: palette.muted }}>Facebook · Unavailable</Txt></View></SettingsSection>
+      </View>
+    </View>
+  </CustomerProfileFrame>;
   if (desktop && account) return <DesktopShopSettings title="Account information" description="Manage your personal details and shop verification records." active="account">
     <QueryState loading={profile.isLoading} error={profile.error} retry={() => profile.refetch()} />
     <SettingsSection title="Personal information" description="Keep your name and contact number current so we can reach you.">

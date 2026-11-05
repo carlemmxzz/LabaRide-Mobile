@@ -43,6 +43,24 @@ test('board only queries ready unassigned approved-shop jobs and returns private
   f.rider.online = false;
   assert.deepEqual((await f.invoke('availableJobs')).data.jobs, []);
 });
+
+test('shop and customer order details include assigned rider identity, contact and profile photo', async () => {
+  const f=fixture('DeliveryAccepted');
+  f.order.events=[]; f.order.shop.services=[];
+  f.order.assignments=[{id:32,riderId:7,stage:'Delivery',status:'Accepted',rider:{id:7,name:'Assigned Rider',phone:'09123456789',photo:{updatedAt:new Date('2026-11-05T00:00:00Z')}}}];
+  for(const userId of [1,2]) {
+    const result=await f.invoke('detail',{},userId);
+    assert.equal(result.error,undefined);
+    const rider=result.data.assignments[0].rider;
+    assert.equal(rider.id,7);
+    assert.equal(rider.name,'Assigned Rider');
+    assert.equal(rider.phone,'09123456789');
+    assert.match(rider.photoUrl,/^\/api\/users\/7\/photo\?v=\d+$/);
+    assert.equal(rider.photo,undefined);
+  }
+  f.order.assignments[0].status='Reassigned';
+  assert.equal((await f.invoke('detail',{},2)).data.assignments[0].rider.phone,undefined);
+});
 test('claim immediately accepts each stage, notifies all parties, and acknowledges retries without duplicates', async () => {
   for (const status of ['PickupQueued', 'ReadyForDelivery']) {
     const f = fixture(status);
@@ -51,6 +69,13 @@ test('claim immediately accepts each stage, notifies all parties, and acknowledg
     assert.equal(f.order.assignments[0].status, 'Accepted');
     assert.equal(f.order.workflowStatus, status === 'PickupQueued' ? 'PickupAccepted' : 'DeliveryAccepted');
     assert.equal(f.events[0].action, 'JobClaimed');
+    if(status==='ReadyForDelivery') {
+      const shopNotice=f.notices.find(item=>item.shopMode);
+      const customerNotice=f.notices.find(item=>item.audience==='customer');
+      assert.equal(shopNotice.title,'Rider is on the way to the shop');
+      assert.match(shopNotice.message,/collect the clean laundry for the customer/);
+      assert.match(customerNotice.message,/on the way to collect your clean laundry/);
+    }
     assert.deepEqual(f.notices.map(item => item.audience).sort(), ['admin', 'customer', 'partner', 'rider']);
     assert.equal((await f.invoke('claim')).error, undefined);
     assert.equal(f.order.assignments.length, 1); assert.equal(f.events.length, 1);

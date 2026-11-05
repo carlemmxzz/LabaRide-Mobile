@@ -108,10 +108,9 @@ export function ShopOrdersDesign() {
   function changeSection(value: OrderSection) { setSection(value); setFilter("All"); setPage(0); }
   function changeFilter(value: ShopOrderFilter) { setFilter(value); setPage(0); }
   return <Screen title="Orders" back={false} background={palette.surface}
-    right={<IconButton label="Notifications" onPress={() => router.push({ pathname: "/shop/transactions/[flow]", params: { flow: "shop-notifications" } })}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton>}>
+    right={<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><LiveOperationsButton /><IconButton label="Notifications" onPress={() => router.push({ pathname: "/shop/transactions/[flow]", params: { flow: "shop-notifications" } })}><NotificationBell shopMode size={22} color={palette.primary} /></IconButton></View>}>
     <View style={{ gap: 20 }}>
       <View><Txt style={{ fontSize: 22, fontWeight: "700" }}>Your laundry orders</Txt><Txt style={{ color: palette.muted }}>Manage customer orders, laundry progress and handovers.</Txt></View>
-      <LiveOperationsButton />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>{summaries.map(({ title, filter: value, Icon }) => {
         const selected = section === "Active" && filter === value;
         return <Pressable key={title} accessibilityRole="button" accessibilityLabel={`Show ${title.toLowerCase()} orders`} accessibilityState={{ selected }}

@@ -110,6 +110,8 @@ function ToastCard({ item, visible, reduceMotion, removed }: Presented & { reduc
 
 export function ToastHost() {
   useNotificationToasts();
+  const { width } = useWindowDimensions();
+  const desktop = width >= 1024;
   const items = useSyncExternalStore(toast.subscribe, toast.getSnapshot, toast.getSnapshot);
   const [presented, setPresented] = useState<Presented[]>([]);
   const [blocked, setBlocked] = useState(!!getDialog());
@@ -151,8 +153,9 @@ export function ToastHost() {
   }, [items]);
   function removed(id: string) { setPresented(rows => rows.filter(row => row.item.id !== id || row.visible)); }
   if (blocked) return null;
-  return <View pointerEvents="box-none" testID="toast-host" style={{ position: "absolute", top: Math.max(0, insets.top) + 12,
-    left: 12, right: 12, zIndex: 2147483647, elevation: 1000, gap: 8 }}>
+  return <View pointerEvents="box-none" testID="toast-host" style={{ position: "absolute", top: Math.max(0, insets.top) + (desktop ? 20 : 12),
+    left: desktop ? undefined : 12, right: desktop ? 24 : 12, width: desktop ? 440 : undefined,
+    zIndex: 2147483647, elevation: 1000, gap: 8 }}>
     {presented.map(row => <ToastCard key={row.item.id} {...row} reduceMotion={reduceMotion} removed={removed} />)}
   </View>;
 }

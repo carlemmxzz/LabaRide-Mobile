@@ -83,4 +83,16 @@ test('customer and shop list endpoints return identical timing data without expo
   assert.equal(customer.shop.services, undefined);
   assert.equal(customer.events, undefined);
   assert.equal(partner.events, undefined);
+  row.workflowStatus = 'DeliveryAccepted';
+  row.assignments = [{ id: 77, riderId: 3, stage: 'Delivery', status: 'Accepted' }];
+  events.push({ action: 'HandoffArrived', detail: 'Assignment #77 · collection handover', toStatus: 'DeliveryAccepted', fromStatus: 'DeliveryAccepted', createdAt: new Date() });
+  for(const [method, userId, params] of [['getUserTransactions',1,{userId:'1'}],['getShopTransactions',2,{shopId:'5'}]]) {
+    const arrived = await read(method,userId,params);
+    assert.deepEqual(arrived.handoff,{kind:'collection',arrived:true,released:false});
+    assert.equal(arrived.assignments,undefined,'Assignment records are not exposed in the list');
+    assert.equal(arrived.handoff.marker,undefined);
+    assert.equal(arrived.handoff.riderId,undefined);
+  }
+  row.assignments[0].id = 78;
+  assert.equal((await read('getUserTransactions',1,{userId:'1'})).handoff.arrived,false,'Old rider arrival does not carry to a new assignment');
 });

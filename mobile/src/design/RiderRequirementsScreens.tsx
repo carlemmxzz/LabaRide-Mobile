@@ -16,7 +16,7 @@ export const riderDocumentLabels: Record<string, string> = {
   ProfessionalLicense: 'Professional driver’s license', Clearance: 'NBI or National Police Clearance', TinProof: 'Proof of TIN', OfficialReceipt: 'Motorcycle official receipt (OR)', RegistrationCertificate: 'Motorcycle registration certificate (CR)', OwnerAuthorization: 'Owner authorization / deed of sale',
 };
 type Document = { id: number; type: string; status: string; reviewReason?: string; updatedAt: string };
-type Application = { userId: number; applicationStatus: string; registeredOwner: boolean; licenseNumber?: string; licenseExpiry?: string; motorcycleMake?: string; motorcycleModel?: string; motorcycleYear?: number; plateNumber?: string; documents: Document[]; missing: string[]; user: { name: string; email: string; phone: string; birthdate?: string; address_line_1?: string; city?: string; state_province?: string; postal_code?: string } };
+type Application = { userId: number; applicationStatus: string; active?: boolean; online?: boolean; reviewReason?: string | null; reviewedAt?: string | null; registeredOwner: boolean; licenseNumber?: string; licenseExpiry?: string; motorcycleMake?: string; motorcycleModel?: string; motorcycleYear?: number; plateNumber?: string; documents: Document[]; missing: string[]; user: { name: string; email: string; phone: string; birthdate?: string; address_line_1?: string; city?: string; state_province?: string; postal_code?: string } };
 const fields = { name: '', phone: '', birthdate: '', address_line_1: '', city: '', state_province: '', postal_code: '', licenseNumber: '', licenseExpiry: '', motorcycleMake: '', motorcycleModel: '', motorcycleYear: '', plateNumber: '' };
 const labels: Record<keyof typeof fields, string> = { name: 'Full name', phone: 'Contact number', birthdate: 'Birthdate (18 or older)', address_line_1: 'Street / barangay / house number', city: 'City or municipality', state_province: 'Province', postal_code: 'Postal code', licenseNumber: 'Professional license number', licenseExpiry: 'License expiry date', motorcycleMake: 'Motorcycle brand', motorcycleModel: 'Motorcycle model', motorcycleYear: 'Year model', plateNumber: 'Plate / registration' };
 const documentHints: Record<string, string> = {
@@ -93,7 +93,9 @@ function RiderReviewSummary({ application, values, owner, required, edit, disabl
 }
 export function useRiderApplication(userId?: number) {
   const user = useAuthStore(state => state.user);
-  return useQuery({ queryKey: ['rider-application', user?.id, userId], enabled: !!user, queryFn: () => api.get<Application>(userId ? `/delivery/applications/${userId}` : '/delivery/application'), refetchInterval: 15000 });
+  const ownApplication = userId == null || userId === user?.id;
+  return useQuery({ queryKey: ['rider-application', user?.id, ownApplication ? undefined : userId], enabled: !!user,
+    queryFn: () => api.get<Application>(ownApplication ? '/delivery/application' : `/delivery/applications/${userId}`), refetchInterval: 15000 });
 }
 
 export function RiderOnboardingDesign({ onSubmitted }: { onSubmitted: () => void }) {

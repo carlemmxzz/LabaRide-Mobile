@@ -5,6 +5,7 @@ import { address, type Order } from "./data";
 import { Button, Card, PriceRow, Screen, Txt, money, styles, usePalette } from "./ui";
 import { OrderStepIndicator } from "./OrderStepIndicator";
 import { OrderActivity, OrderBentoCard, OrderBentoGrid, OrderFact } from './OrderBento';
+import { returnDeliveryUpdate } from './return-delivery';
 import { originalOrderDetailProgress, orderDetailSteps } from "./order-detail-steps";
 import { ProcessingTimer, type ProcessingTimerActions } from "./ProcessingTimer";
 import { orderUpdateText } from "./TurnaroundDetails";
@@ -75,7 +76,7 @@ export function OriginalOrderDetails({ order, partner = false, primaryAction, bo
             {!!order.estimateReason && <Txt style={styles.muted}>{order.estimateReason}</Txt>}
           </View>}
           {viewedStep === 3 && <>
-            <Txt>{order.deliveryType === "Deliver" ? "Return delivery to the customer." : "Customer collection at the shop."}</Txt>
+            <Txt>{returnDeliveryUpdate(order, partner)?.description || (order.deliveryType === "Deliver" ? "Return delivery to the customer." : "Customer collection at the shop.")}</Txt>
             {!!order.readyAt && <Txt style={styles.muted}>Laundry ready: {timestamp(order.readyAt)}</Txt>}
           </>}
           {viewedStep === 4 && !!order.completedAt && <Txt style={styles.muted}>Completed: {timestamp(order.completedAt)}</Txt>}

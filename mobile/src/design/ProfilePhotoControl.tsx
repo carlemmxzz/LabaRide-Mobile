@@ -13,7 +13,7 @@ function photoUri(userId: number, photoUrl?: string | null) {
     ? `${API_URL.replace(/\/$/, "")}${photoUrl}` : undefined;
 }
 
-export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; photoUrl?: string | null }) {
+export function ProfilePhotoControl({ userId, photoUrl, size = 136 }: { userId: number; photoUrl?: string | null; size?: number }) {
   const palette = usePalette();
   const cache = useQueryClient();
   const active = useRef(false);
@@ -23,6 +23,8 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
   const [failedUrl, setFailedUrl] = useState<string>();
   const uri = photoUri(userId, photoUrl);
   const showPhoto = !!uri && failedUrl !== uri;
+  const photoSize = size - 4;
+  const menuSize = size < 100 ? 30 : 38;
 
   async function refresh(nextPhotoUrl: string | null) {
     cache.setQueryData<Profile>(["user", userId], current => current ? { ...current, photoUrl: nextPhotoUrl } : current);
@@ -62,16 +64,16 @@ export function ProfilePhotoControl({ userId, photoUrl }: { userId: number; phot
   }
 
   return <View style={{ alignItems: "center", gap: 6 }}>
-    <View style={{ width: 136, height: 136, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Profile photo options"
         accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => setMenuOpen(true)}
-        style={({ pressed }) => ({ width: 132, height: 132, borderRadius: 66, backgroundColor: palette.soft, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.82 : 1 })}>
+        style={({ pressed }) => ({ width: photoSize, height: photoSize, borderRadius: photoSize / 2, backgroundColor: palette.soft, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.82 : 1 })}>
         {showPhoto ? <Image key={uri} source={{ uri }} accessibilityLabel="Profile photo" onError={() => setFailedUrl(uri)}
-          style={{ width: 132, height: 132, borderRadius: 66 }} /> : <UserRound size={60} color={palette.primary} strokeWidth={1.7} />}
+          style={{ width: photoSize, height: photoSize, borderRadius: photoSize / 2 }} /> : <UserRound size={Math.round(photoSize * 0.45)} color={palette.primary} strokeWidth={1.7} />}
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Profile photo options" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => setMenuOpen(true)}
-        style={({ pressed }) => ({ position: "absolute", right: -1, bottom: -1, width: 38, height: 38, borderRadius: 19, backgroundColor: "white", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: palette.line, opacity: pressed ? 0.78 : 1 })}>
-        {busy ? <ActivityIndicator size="small" color={palette.primary} /> : <MoreVertical size={21} color={palette.primary} />}
+        style={({ pressed }) => ({ position: "absolute", right: -1, bottom: -1, width: menuSize, height: menuSize, borderRadius: menuSize / 2, backgroundColor: "white", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: palette.line, opacity: pressed ? 0.78 : 1 })}>
+        {busy ? <ActivityIndicator size="small" color={palette.primary} /> : <MoreVertical size={size < 100 ? 18 : 21} color={palette.primary} />}
       </Pressable>
     </View>
     {!!error && <Txt accessibilityLiveRegion="polite" style={{ maxWidth: 300, textAlign: "center", color: palette.danger, fontSize: 12 }}>{error}</Txt>}

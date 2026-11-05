@@ -92,12 +92,12 @@ export function Field({ label, password = false, suffix, style, appearance = "ou
     </View>
   </View>;
 }
-export function Header({ title, dark = false, back = true, right, branded = false }: { title: string; dark?: boolean; back?: boolean; right?: React.ReactNode; branded?: boolean }) {
+export function Header({ title, dark = false, back = true, right, branded = false, maxWidth = 1200 }: { title: string; dark?: boolean; back?: boolean; right?: React.ReactNode; branded?: boolean; maxWidth?: number }) {
   const palette = usePalette();
   const segments = useSegments() as string[];
   const home = segments[0] === "shop" ? "/shop/home" : "/(user)/home";
   return <View style={{ backgroundColor: dark ? palette.primary : "white", borderBottomWidth: 1, borderBottomColor: palette.line }}>
-    <View style={{ width: "100%", maxWidth: 1200, alignSelf: "center", minHeight: 72, paddingHorizontal: 20, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+    <View style={{ width: "100%", maxWidth, alignSelf: "center", minHeight: 72, paddingHorizontal: maxWidth > 1200 ? 32 : 20, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
       {back && <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.canGoBack() ? router.back() : router.replace(home)}
         style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><ArrowLeft size={22} color={dark ? "white" : palette.primary} /></Pressable>}
       {branded ? <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -107,10 +107,11 @@ export function Header({ title, dark = false, back = true, right, branded = fals
     </View>
   </View>;
 }
-export function Screen({ title, children, footer, dark, background, back = true, scroll = true, padded = true, right, brandedHeader = false, maxWidth = 1200 }: {
+export function Screen({ title, children, footer, dark, background, back = true, scroll = true, padded = true, right, brandedHeader = false, maxWidth = 1200, header }: {
   title?: string; children: React.ReactNode; footer?: React.ReactNode; dark?: boolean; background?: string;
   back?: boolean; scroll?: boolean; padded?: boolean; right?: React.ReactNode;
   brandedHeader?: boolean;
+  header?: React.ReactNode;
   maxWidth?: number;
 }) {
   const palette = usePalette();
@@ -123,7 +124,7 @@ export function Screen({ title, children, footer, dark, background, back = true,
   return <SafeAreaView style={{ flex: 1, backgroundColor: darkHeader ? palette.primary : background || palette.surface }} edges={inTab ? ["top", "left", "right"] : ["top", "left", "right", "bottom"]}>
     <StatusBar style={darkHeader ? "light" : "dark"} />
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: background || palette.surface }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      {!!title && <Header title={title} dark={darkHeader} back={back} right={right} branded={brandedHeader} />}
+      {header ?? (!!title && <Header title={title} dark={darkHeader} back={back} right={right} branded={brandedHeader} maxWidth={maxWidth} />)}
       {scroll ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={content} showsVerticalScrollIndicator={false}>{children}</ScrollView> : <View style={[content, { flex: 1 }]}>{children}</View>}
       {footer && <View style={{ backgroundColor: "white", borderTopWidth: 1, borderTopColor: palette.line }}><View style={{ width: "100%", maxWidth: 1200, alignSelf: "center", padding: 20 }}>{footer}</View></View>}
     </KeyboardAvoidingView>
@@ -142,7 +143,7 @@ export function Section({ title, action, onPress, light = false }: { title: stri
 export function MenuRow({ title, detail, asset, onPress, color }: { title: string; detail?: string; asset?: AssetName; onPress?: () => void; color?: string }) {
   const palette = usePalette();
   const accent = color || palette.primary;
-  return <Pressable accessibilityRole={onPress ? "button" : undefined} disabled={!onPress} onPress={onPress}
+  return <Pressable accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={onPress ? title : undefined} accessibilityHint={onPress ? detail : undefined} disabled={!onPress} onPress={onPress}
     style={({ pressed }) => [styles.row, { minHeight: 64, padding: 16, borderWidth: 1, borderColor: palette.line, borderRadius: 12, backgroundColor: pressed ? palette.soft : "white" }]}>
     {asset && <Asset name={asset} tint={accent} />}<View style={styles.grow}><Txt style={{ fontWeight: "600", color: accent }}>{title}</Txt>{!!detail && <Txt style={[styles.muted, { marginTop: 4 }]}>{detail}</Txt>}</View>
     {onPress && <ChevronRight size={18} color={palette.muted} />}

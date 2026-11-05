@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Asset, Brand, Txt, usePalette } from "../../src/design/ui";
 import { workspaceSidebar } from '../../src/navigation/WorkspaceSidebar';
 import { ClipboardList, House, UserRound } from 'lucide-react-native';
+import { BottomTabBar } from 'expo-router/tabs';
+import { CustomerLiveUpdates } from '../../src/design/CustomerLiveUpdates';
 export default function UserTabs() {
   const palette = usePalette();
   const { width } = useWindowDimensions();
@@ -16,6 +18,7 @@ export default function UserTabs() {
   );
   return (
     <InterfaceTheme role="customer"><Tabs
+      tabBar={!desktop && !hideTabs ? props => <View><CustomerLiveUpdates /><BottomTabBar {...props} /></View> : undefined}
       screenOptions={{
         headerShown: false,
         tabBarBackground: desktop ? () => <View pointerEvents="none" style={{ position: "absolute", top: 24, left: 20 }}><Brand /><Txt style={{ color: palette.muted, marginTop: 8 }}>Your laundry, simplified</Txt></View> : undefined,

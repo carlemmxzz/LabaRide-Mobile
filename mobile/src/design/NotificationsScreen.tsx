@@ -1,3 +1,4 @@
+import { RiderHeader } from './RiderHeader';
 import { Pressable, View } from "react-native";
 import { useRef, useState } from 'react';
 import { useIsFocused } from "expo-router";
@@ -55,8 +56,9 @@ export function NotificationsDesign({ shopMode = false, audience }: { shopMode?:
     } catch (error) { fail(error); }
   }
 
-  return <Screen title="Notifications" brandedHeader={audience === 'admin'}>
+  return <Screen title="Notifications" brandedHeader={audience === 'admin'} header={audience === 'rider' ? <RiderHeader /> : undefined}>
     <View style={styles.stack}>
+      {audience === 'rider' && <Txt style={styles.title}>Updates</Txt>}
       <QueryState loading={notifications.isLoading} error={notifications.error} retry={() => notifications.refetch()} />
       {readCount > 0 && <View style={styles.between}><Txt style={{ color: palette.muted, fontSize: 12 }}>Remove read notifications to tidy this list.</Txt><Button title={`Delete read (${readCount})`} compact outline color={palette.danger} busy={deleting === 'read'} disabled={deleting !== null} icon={<Trash2 size={15} color={palette.danger} />} onPress={() => { void remove(); }} /></View>}
       {!!error && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{error}</Txt>}

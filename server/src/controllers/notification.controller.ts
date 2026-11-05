@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/database';
 import { sendSuccess, sendError } from '../utils/response';
+import { readableNotification } from '../utils/order-notification-copy';
 
 function notificationScope(req: AuthRequest) {
   return { userId: req.user!.userId, ...(req.query.audience === 'rider' || req.query.audience === 'admin'
@@ -21,10 +22,11 @@ export function riderHandoff(order: { workflowStatus: string | null; pickupCode:
 export class NotificationController {
   static async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const notifications = await prisma.notification.findMany({
+      const records = await prisma.notification.findMany({
         where: notificationScope(req),
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
+      const notifications = records.map(readableNotification);
       if (req.query.audience !== 'rider') return sendSuccess(res, notifications);
       // Resolve current access at read time: never store codes in historical notifications.
       const orders = await prisma.transaction.findMany({

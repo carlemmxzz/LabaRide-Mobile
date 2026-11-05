@@ -9,7 +9,8 @@ import { useAuthStore } from "../../src/store/authStore";
 import { useOwnedShop } from "../../src/design/data";
 import { socketService } from "../../src/services/socket.service";
 import { workspaceSidebar } from '../../src/navigation/WorkspaceSidebar';
-import { ClipboardList, House, UserRound, WashingMachine } from 'lucide-react-native';
+import { ShopDesktopSidebar } from '../../src/navigation/ShopDesktopSidebar';
+import { ClipboardList, House, ListTree, UserRound, WashingMachine } from 'lucide-react-native';
 export default function ShopTabs() {
   return <InterfaceTheme role="shop"><ShopTabsContent /></InterfaceTheme>;
 }
@@ -29,6 +30,7 @@ function ShopTabsContent() {
   return (
     <Tabs
       initialRouteName="home"
+      tabBar={desktop ? props => <ShopDesktopSidebar {...props} /> : undefined}
       screenOptions={{
         headerShown: false,
         tabBarBackground: desktop ? () => <View pointerEvents="none" style={{ position: "absolute", top: 24, left: 20 }}><Brand /><Txt style={{ color: palette.muted, marginTop: 8 }}>Shop management</Txt></View> : undefined,
@@ -68,6 +70,7 @@ function ShopTabsContent() {
           ),
         }}
       />
+      <Tabs.Screen name="operations" options={{ title: "Live operations", href: desktop ? undefined : null, tabBarIcon: ({ color }) => <ListTree size={24} color={color} /> }} />
       <Tabs.Screen
         name="services"
         options={{

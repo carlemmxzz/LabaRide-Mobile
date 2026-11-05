@@ -13,12 +13,13 @@ const invoiceTest = process.argv.includes('--invoices');
 const weightTest = process.argv.includes('--weight-evidence');
 const responseTest = process.argv.includes('--assignment-response');
 const pullTest = process.argv.includes('--pull-jobs');
+const riderAlertsTest = process.argv.includes('--rider-job-alerts');
 const bookingTest = process.argv.includes('--booking-confirmation');
 const trackingTest = process.argv.includes('--rider-tracking');
 const callTest = process.argv.includes('--call-contact');
 const shopRequirementsTest = process.argv.includes('--shop-requirements');
 const notificationsTest = process.argv.includes('--notification-delete');
-const deliveryTest = process.argv.includes('--delivery') || weightTest || responseTest || pullTest || bookingTest || trackingTest || callTest;
+const deliveryTest = process.argv.includes('--delivery') || weightTest || responseTest || pullTest || riderAlertsTest || bookingTest || trackingTest || callTest;
 const riderApplicationTest = process.argv.includes('--rider-application');
 const dispatchTest = process.argv.includes('--dispatch');
 const applicationTest = process.argv.includes('--application');
@@ -26,6 +27,7 @@ const dialogTest = process.argv.includes('--dialogs');
 const logoutTest = process.argv.includes('--logout');
 const brandTest = process.argv.includes('--branding');
 const shopBrowseTest = process.argv.includes('--shop-browsing');
+const customerProfileTest = process.argv.includes('--customer-profile');
 const desktopSettingsTest = process.argv.includes('--desktop-settings');
 const settingsWrites = [];
 const scheduleTest = process.argv.includes('--schedule');
@@ -183,7 +185,7 @@ async function clickText(text) {
   await pause(150);
 }
 (async () => {
-  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest || desktopSettingsTest) {
+  if (photoTest || riderApplicationTest || weightTest || shopRequirementsTest || desktopSettingsTest || customerProfileTest) {
     const sharp = require('../../server/node_modules/sharp');
     photoBytes = await sharp({ create: { width: 240, height: 160, channels: 3, background: '#2457AD' } }).jpeg().toBuffer();
     fs.writeFileSync(path.join(artifacts,'upload-test.jpg'),photoBytes);
@@ -235,6 +237,11 @@ async function clickText(text) {
         }
         if (!request.url.includes('/api/')) { await command('Fetch.continueRequest',{ requestId }); return; }
         const endpoint = new URL(request.url).pathname;
+        if(customerProfileTest && endpoint==='/api/users/7/photo') {
+          if(request.method==='PUT') { const body=JSON.parse(request.postData);assert.ok(body.imageBase64);settingsWrites.push({endpoint});user.photoUrl='/api/users/7/photo?v=1'; }
+          const binary=request.method==='GET';
+          await command('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:binary?'image/jpeg':'application/json'},{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'},{name:'Access-Control-Allow-Methods',value:'GET, PUT, DELETE, OPTIONS'}],body:binary?photoBytes.toString('base64'):Buffer.from(JSON.stringify({success:true,data:{photoUrl:user.photoUrl}})).toString('base64')});return;
+        }
         if (invoiceTest && /^\/api\/transactions\/\d+\/invoice$/.test(endpoint)) {
           const orderId = Number(endpoint.split('/')[3]);
           const data = { number: `LR-${String(orderId).padStart(6,'0')}`, orderId, createdAt: '2026-11-04T00:00:00Z', updatedAt: '2026-11-04T01:00:00Z', status: 'LaundryReceived', currency: 'PHP', customer: { name: 'Test Invoice Customer' }, shop: { name: 'Test Laundry & Fabric Care', address: '123 Main Street, Naga', phone: '09123456789' }, serviceName: 'Full Service', kilos: '8.25', items: [{ itemName: 'Shirt', quantity: 3 }], subtotal: '215.10', deliveryFee: '30.00', discount: '10.00', total: '235.10', paymentMethod: 'Cash on Delivery' };
@@ -242,7 +249,7 @@ async function clickText(text) {
           return;
         }
         const photoEndpoint = endpoint === '/api/shops/101/photo';
-        if(pullTest && request.method==='GET' && /^\/api\/delivery\/orders\/(42|43)\/route-preview$/.test(endpoint)) {
+        if((pullTest || riderAlertsTest) && request.method==='GET' && /^\/api\/delivery\/orders\/(42|43)\/route-preview$/.test(endpoint)) {
           const pickup=endpoint.includes('/42/');
           const customer=missingRoutePin?null:{latitude:pickup?13.62:13.64,longitude:pickup?123.19:123.21},shop={latitude:13.63,longitude:123.2};
           const data={orderId:pickup?42:43,workflowVersion:3,stage:pickup?'Pickup':'Delivery',origin:pickup?customer:shop,destination:pickup?shop:customer,missingPins:missingRoutePin?['customer']:[]};
@@ -269,12 +276,12 @@ async function clickText(text) {
           || servicesTest && ['POST','PUT'].includes(request.method) && /^\/api\/shops\/101\/services(?:\/\d+)?$/.test(endpoint)
           || servicesTest && request.method === 'POST' && endpoint === '/api/shops/101/kilo-prices'
           || approvalTest && request.method === 'PUT' && ['/api/admin/shops/101/review','/api/shops/101/application'].includes(endpoint)
-          || desktopSettingsTest && request.method === 'PUT' && ['/api/users/7','/api/users/7/password','/api/shops/101'].includes(endpoint)
+          || (desktopSettingsTest || customerProfileTest) && request.method === 'PUT' && ['/api/users/7','/api/users/7/password','/api/shops/101'].includes(endpoint)
           || applicationTest && request.method === 'POST' && endpoint === '/api/auth/verify-token'
           || approvalTest && request.method === 'POST' && endpoint === '/api/auth/login', 'UI smoke tests must not mutate real records');
         if (mode === 'loading') await pause(2500);
         if (closing) return;
-        if (desktopSettingsTest && request.method === 'PUT') {
+        if ((desktopSettingsTest || customerProfileTest) && request.method === 'PUT') {
           const body = JSON.parse(request.postData);
           settingsWrites.push({ endpoint, body });
           if (endpoint === '/api/users/7') Object.assign(user, body);
@@ -315,7 +322,7 @@ async function clickText(text) {
           if (body.status === 'Ready') orders[0].readyAt = changedAt;
           if (body.status === 'Completed') orders[0].completedAt = changedAt;
         }
-        if (notificationsTest && endpoint.startsWith('/api/notifications')) {
+        if ((notificationsTest || processingTimerTest) && endpoint.startsWith('/api/notifications')) {
           const params = new URL(request.url).searchParams;
           const scope = item => item.userId === 7 && (['rider','admin'].includes(params.get('audience')) ? item.audience === params.get('audience') : !['rider','admin'].includes(item.audience) && item.shopMode === (params.get('shopMode') === 'true'));
           let data = notificationRecords.filter(scope), status = 200;
@@ -369,14 +376,16 @@ async function clickText(text) {
           return;
         }
         if (bookingTest && request.method === 'PUT' && endpoint === '/api/delivery/orders/42/action') {
-          const body = JSON.parse(request.postData); assert.equal(body.action, 'confirmBooking'); assert.equal(body.note, 'ok');
+          const body = JSON.parse(request.postData); assert.ok(['confirmBooking', 'cancel'].includes(body.action));
+          if (body.action === 'confirmBooking') assert.equal(body.note, undefined);
+          else assert.equal(body.note, 'Too busy');
           assert.equal(body.expectedVersion, bookingVersion); bookingWrites.push(body);
           if (bookingConflict) {
             bookingConflict = false; bookingVersion++;
             await command('Fetch.fulfillRequest', { requestId, responseCode: 409, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }], body: Buffer.from(JSON.stringify({ success: false, error: { message: 'Order changed. Refresh and try again.' } })).toString('base64') });
             return;
           }
-          bookingState = 'PickupQueued'; bookingVersion++;
+          bookingState = body.action === 'cancel' ? 'Cancelled' : 'PickupQueued'; bookingVersion++;
         }
         if (pullTest && request.method === 'PUT' && endpoint === '/api/delivery/availability') boardOnline = JSON.parse(request.postData).online;
         if (pullTest && request.method === 'PUT' && endpoint.endsWith('/claim')) {
@@ -483,7 +492,7 @@ async function clickText(text) {
         const data = endpoint === '/api/delivery/available-jobs' ? { rider: { online: boardOnline, workload: boardWorkload, capacity: 3, hasPosition: boardHasPosition }, limit: 100, jobs: boardOnline ? publicBoardJobs.filter(job => !job.claimed).map(job=>boardHasPosition?job:{...job,distanceKm:null}) : [] }
           : pullTest && endpoint === '/api/delivery/rider' ? { rider: { online: boardOnline }, jobs: pullAssignedJobs }
           : dispatchTest && endpoint.endsWith('/rider-options') ? dispatchOptions
-          : processingTimerTest && /^\/api\/delivery\/orders\/(42|43)$/.test(endpoint) ? { ...orders.find(order => String(order.id) === endpoint.split('/').pop()), assignments: [], events: [] }
+          : processingTimerTest && /^\/api\/delivery\/orders\/(42|43)$/.test(endpoint) ? { ...orders.find(order => String(order.id) === endpoint.split('/').pop()), assignments: orders.find(order => String(order.id) === endpoint.split('/').pop()).assignments || [], events: [] }
           : orderStepsTest && endpoint === '/api/delivery/orders/42' ? { ...orders[0], collectionCode: user.isShopOwner ? '234567' : undefined, pickupCode: user.isShopOwner ? undefined : '123456', deliveryCode: user.isShopOwner ? undefined : '345678' }
           : dispatchTest && endpoint === '/api/delivery/operations' ? { orders: dispatchOrders, riders: [] }
           : riderApplicationTest && (endpoint === '/api/delivery/application' || endpoint === '/api/delivery/applications/12') ? requirementFixture
@@ -506,7 +515,7 @@ async function clickText(text) {
             return { range: { start: range.start, end: range.end, granularity: range.granularity, timeZone: 'Asia/Manila' }, summary, series,
               popularServices: mode === 'empty' ? [] : [{ name: 'Full Service', orders: 2, kilos: 16, value: 430 }, { name: 'Wash Only', orders: 1, kilos: 8, value: 215 }],
               workload: mode === 'empty' ? { pending: 0, queued: 0, ready: 0 } : { pending: 3, queued: 2, ready: 1 }, undatedCompletedOrders: mode === 'empty' ? 0 : 2 };
-          })() : endpoint.startsWith('/api/shops/') ? shops[0] : endpoint.startsWith('/api/transactions/') ? mode==='empty'?[]:orders : [];
+          })() : endpoint.startsWith('/api/shops/') ? shops[0] : endpoint.startsWith('/api/transactions/') ? mode==='empty'?[]:processingTimerTest && endpoint.includes('/transactions/user/') ? orders.map(({handoff,...order})=>order) : orders : [];
         await command('Fetch.fulfillRequest',{ requestId, responseCode: mode==='error'?503:200,
           responseHeaders: [{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}, {name:'Access-Control-Allow-Methods',value:'GET, PUT, DELETE, OPTIONS'}],
           body: Buffer.from(JSON.stringify(mode==='error'?{success:false,error:{message:'Test service unavailable'}}:{success:true,data})).toString('base64') });
@@ -515,6 +524,39 @@ async function clickText(text) {
   });
   await command('Page.enable'); await command('Runtime.enable');
   await command('Fetch.enable',{ patterns:[{urlPattern:'*/api/*'}, ...(trackingTest || pullTest || shopBrowseTest ? [{urlPattern:'*unpkg.com/leaflet*'}] : []), ...(pullTest?[{urlPattern:'https://api.mapbox.com/directions/*'}]:[])] });
+  if(customerProfileTest) {
+    user.phone='09123456789';user.birthdate='1995-05-10T00:00:00.000Z';user.gender='Male';user.isAdmin=false;user.isRider=false;
+    for(const width of [390,768,1100,1440,1920]) {
+      await visit('/profile',width,'Personal details',`customer-profile-${width}`);
+      assert.equal(await evaluate(`Array.from(document.querySelectorAll('[data-testid="customer-profile-desktop"]')).some(e=>e.checkVisibility())`),width>=1100);
+      await clickText('Edit profile');
+      await waitFor(`document.body.innerText.includes(${JSON.stringify(width>=1100?'Profile details':'Profile photo updates are unavailable')})`);
+      await pause(300);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Edit profile fits viewport');
+      const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(artifacts,`customer-profile-edit-${width}.png`),Buffer.from(shot.data,'base64'));
+    }
+    async function input(label,value) { await evaluate(`(()=>{const e=Array.from(document.querySelectorAll('input')).find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)}&&e.checkVisibility());Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`); }
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('input[aria-label="Email Address"]')).find(e=>e.checkVisibility()).readOnly`),true);
+    await input('Name','Updated Customer');await input('Contact Number','09998887777');await input('Gender','Other');await input('Birthdate','1996-06-15');
+    await evaluate(`Array.from(document.querySelectorAll('[aria-label="Profile photo options"]')).find(e=>e.checkVisibility()).click()`);
+    await clickText('Change photo');await waitFor('!!document.querySelector("input[type=file]")');
+    const {root:photoRoot}=await command('DOM.getDocument');const {nodeId:photoInput}=await command('DOM.querySelector',{nodeId:photoRoot.nodeId,selector:'input[type=file]'});
+    await command('DOM.setFileInputFiles',{nodeId:photoInput,files:[path.join(artifacts,'upload-test.jpg')]});
+    await waitFor('document.body.innerText.includes("Photo updated")');
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('input[aria-label="Name"]')).find(e=>e.checkVisibility()).value`),'Updated Customer','Changing the photo preserves unsaved form fields');
+    await clickText('Save Changes');await waitFor('location.pathname==="/profile"&&document.body.innerText.includes("Updated Customer")');
+    const profileWrite=settingsWrites.find(write=>write.endpoint==='/api/users/7');
+    assert.deepEqual(profileWrite.body,{name:'Updated Customer',phone:'09998887777',birthdate:'1996-06-15',gender:'Other'});
+    await clickText('Addresses');await waitFor('document.body.innerText.includes("Your Addresses")');
+    await visit('/profile',1440,'Personal details');await clickText('Transactions');await waitFor('location.pathname==="/history"');
+    await visit('/edit-profile',1440,'Profile details');await clickText('Edit address');await waitFor('document.body.innerText.includes("Confirm Location")');
+    await visit('/edit-profile',1440,'Profile details');await clickText('Change Password');await waitFor('document.body.innerText.includes("Current Password")');
+    await visit('/edit-profile',1440,'Profile details');await clickText('Delete Account');await waitFor('document.body.innerText.includes("Continue")');await clickText('Cancel');
+    await visit('/profile',1440,'Personal details');await clickText('Logout');await waitFor('!!document.querySelector("[data-testid=app-dialog]")');await clickText('Cancel');await waitFor('!document.querySelector("[data-testid=app-dialog]")');
+    await clickText('Switch to Shop Mode');await waitFor('location.pathname==="/shop/profile"');
+    assert.equal(settingsWrites.length,2,'Only the photo upload and explicit profile save write data');
+    assert.deepEqual(errors,[]);console.log('PASS responsive customer profile/edit, photo upload preserving drafts, profile save, read-only email, address/history/security navigation, cancelled deletion/logout and shop switch');return;
+  }
   if(shopBrowseTest) {
     user.isShopOwner=false; user.isRider=false; user.isAdmin=false;
     for(const width of [320,390,768,1440]) {
@@ -853,11 +895,14 @@ async function clickText(text) {
       { route: '/admin/notifications', audience: 'admin', shopMode: false, widths: [390,1440] },
     ];
     for (const entry of cases) for (const width of entry.widths) {
-      notificationRecords = ['customer','partner','rider','admin'].flatMap((audience,index) => [1,2,3].map(n => ({ id: index*100+n, transactionId:42, userId:7, audience, shopMode: audience==='partner', title:n===2?'Unread status update':'Read status update', message:'Your order status changed.', createdAt:new Date().toISOString(), readAt:n===2?null:new Date().toISOString() })));
+      notificationRecords = ['customer','partner','rider','admin'].flatMap((audience,index) => [1,2,3].map(n => ({ id: index*100+n, transactionId:42, userId:7, audience, shopMode: audience==='partner', title:n===1?'Completed':n===2?'Rider arrived — confirm the handover in order details':'Handover confirmed — rider can confirm receipt', message:'Order #42: Completed. Assignment #56 · delivery handover', createdAt:new Date().toISOString(), readAt:n===2?null:new Date().toISOString() })));
       notificationRecords.push({id:999, userId:8, audience:'customer', shopMode:false, readAt:new Date().toISOString()});
       const base=['customer','partner','rider','admin'].indexOf(entry.audience)*100;
       user.isAdmin=entry.audience==='admin'; user.isRider=entry.audience==='rider'; user.isShopOwner=entry.audience==='partner';
       await visit(entry.route,width,'Delete read (2)',`notification-delete-${entry.audience}-${width}`);
+      assert.ok(!(await evaluate('document.body.innerText')).includes('Assignment #'),'Old API assignment markers are removed before display');
+      const completionTitle={customer:'Order complete',partner:'Order completed',rider:'Delivery complete',admin:'Order fulfilled'}[entry.audience];
+      assert.ok(await evaluate(`document.querySelector('[data-testid="notification-${base+1}"]').innerText.includes(${JSON.stringify(completionTitle)})`));
       assert.equal(await evaluate(`document.querySelector('[data-testid="notification-${base+2}"]').querySelectorAll('[aria-label="Delete"]').length`),0,'Unread items have no Delete button');
       const currentPath=await evaluate('location.pathname'), before=notificationDeletes.length;
       async function deleteRow(id) { await evaluate(`document.querySelector('[data-testid="notification-${id}"] [aria-label="Delete"]').click()`); await pause(150); }
@@ -1000,29 +1045,100 @@ async function clickText(text) {
     return;
   }
   if (bookingTest) {
+    user.isRider = false; user.isShopOwner = true;
+    delete orders[0].workflowStatus;
+    for (const width of [320,1440]) {
+      await visit('/shop/transactions/shop-transaction?id=42',width,'Accept order');
+      assert.ok(!(await evaluate('document.body.innerText')).includes('Acceptance explanation'));
+      const positions = await evaluate(`['Decline','Accept order'].map(label=>document.querySelector('[aria-label="'+label+'"]').getBoundingClientRect().y)`);
+      assert.equal(positions[0],positions[1]);
+      await clickText('Decline');
+      await waitFor('!!document.querySelector("[data-testid=decline-order-modal]")');
+      await clickText('Keep order');
+      await waitFor('!document.querySelector("[data-testid=decline-order-modal]")');
+    }
     user.isRider = false; user.isShopOwner = true; orders[0].workflowStatus = 'BookingPending';
     for (const width of [320, 1440]) {
       bookingState = 'BookingPending'; bookingVersion = 0;
-      await visit('/shop/customers/orders/42', width, 'Confirm booking');
+      await visit('/shop/customers/orders/42', width, 'Accept order');
       const before = bookingWrites.length;
-      await clickText('Confirm booking');
-      await waitFor('document.body.innerText.includes("Enter an acceptance explanation before confirming")');
-      assert.equal(bookingWrites.length, before, 'Blank explanation is blocked locally');
-      await evaluate(`(()=>{const e=document.querySelector('[aria-label="Acceptance explanation"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'ok');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-      await clickText('Confirm booking'); await clickText('Continue');
-      await waitFor('document.body.innerText.includes("Pickup Queued") && !document.body.innerText.includes("Confirm booking")');
+      const orderPath = await evaluate('location.pathname');
+      assert.ok(!(await evaluate('document.body.innerText')).includes('Acceptance explanation'));
+      const buttons = await evaluate(`['Decline','Accept order'].map(label=>{const r=document.querySelector('[aria-label="'+label+'"]').getBoundingClientRect();return {x:r.x,y:r.y};})`);
+      assert.equal(buttons[0].y,buttons[1].y,'Decline and Accept share a row');
+      await clickText('Decline');
+      await waitFor('!!document.querySelector("[data-testid=decline-order-modal]")');
+      assert.ok(await evaluate('document.querySelector("[data-testid=decline-order-modal]").getBoundingClientRect().width<=480'));
+      assert.equal(await evaluate('location.pathname'),orderPath,'Declining stays over the order');
+      await clickText('Keep order');
+      await waitFor('!document.querySelector("[data-testid=decline-order-modal]")');
+      assert.equal(bookingWrites.length,before,'Dismissing decline does not change the order');
+      await clickText('Accept order'); await clickText('Continue');
+      await waitFor('document.body.innerText.includes("Pickup Queued") && !document.body.innerText.includes("Accept order")');
       assert.equal(bookingWrites.length, before + 1);
       await clickText('Add a note');
       assert.equal(await evaluate(`document.querySelector('[aria-label="Notes / issue details"]').value`), '', 'Successful confirmation clears the explanation');
     }
     bookingState = 'BookingPending'; bookingVersion = 0; bookingConflict = true;
-    await visit('/shop/customers/orders/42', 390, 'Confirm booking');
-    await evaluate(`(()=>{const e=document.querySelector('[aria-label="Acceptance explanation"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'ok');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-    await clickText('Confirm booking'); await clickText('Continue');
+    await visit('/shop/customers/orders/42', 390, 'Accept order');
+    await clickText('Accept order'); await clickText('Continue');
     await waitFor('document.body.innerText.includes("Order changed. Refresh and try again.")');
-    await clickText('Confirm booking'); await clickText('Continue');
+    await clickText('Accept order'); await clickText('Continue');
     await waitFor('document.body.innerText.includes("Pickup Queued")');
-    console.log('PASS short booking explanation, local validation, cleared notes and refreshed conflict retry on mobile/desktop');
+    bookingState = 'BookingPending'; bookingVersion = 0;
+    await visit('/shop/customers/orders/42',1440,'Accept order');
+    await clickText('Decline'); await clickText('Too busy'); await clickText('Decline order');
+    await waitFor('document.body.innerText.includes("Order cancelled")&&!document.querySelector("[data-testid=decline-order-modal]")');
+    assert.equal(bookingWrites.at(-1).note,'Too busy');
+    console.log('PASS acceptance without explanation, adjacent actions, responsive decline modal, cancellation and refreshed conflict retry');
+    return;
+  }
+  if (riderAlertsTest) {
+    user.isRider=true; user.isAdmin=false; user.isShopOwner=false;
+    await visit('/rider',390,'2 jobs');
+    await evaluate('localStorage.removeItem("labaride-rider-seen-jobs")');
+    for (const width of [390,1440]) {
+      publicBoardJobs.splice(2); boardOnline=true;
+      await visit('/rider',width,'2 jobs');
+      await waitFor('document.querySelector("[data-testid=rider-dashboard-tab]")?.innerText.includes("2")');
+      if (width===390) {
+        await waitFor('document.body.innerText.includes("2 new jobs available")');
+        await clickText('Dismiss notification');
+        await waitFor('!document.querySelector("[data-testid=toast-info]")');
+      } else assert.equal(await evaluate('!!document.querySelector("[data-testid=toast-info]")'),false,'Announced jobs do not repeat after reload');
+      publicBoardJobs.push({...publicBoardJobs[0],id:90});
+      await clickText('Refresh jobs');
+      if(width===390) await waitFor('document.body.innerText.includes("New job available")');
+      await waitFor('document.querySelector("[data-testid=rider-dashboard-tab]")?.innerText.includes("3")');
+      if(width===390) { await clickText('Dismiss notification'); await waitFor('!document.querySelector("[data-testid=toast-info]")'); }
+      await clickText('Refresh jobs'); await pause(400);
+      assert.equal(await evaluate('!!document.querySelector("[data-testid=toast-info]")'),false,'Refresh does not repeat alerts');
+      for(let index=0;index<8;index++) publicBoardJobs.push({...publicBoardJobs[0],id:100+index});
+      await clickText('Refresh jobs');
+      await waitFor('document.querySelector("[data-testid=rider-dashboard-tab]")?.innerText.includes("9+")');
+      if(width===390) { await waitFor('document.body.innerText.includes("8 new jobs available")'); await clickText('View jobs'); }
+      await waitFor('location.pathname==="/rider"');
+      publicBoardJobs.splice(2); await clickText('Refresh jobs');
+      await waitFor('document.querySelector("[data-testid=rider-dashboard-tab]")?.innerText.includes("2")');
+    }
+    assert.deepEqual(errors,[]);
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=new-job-badge-42]")'));
+    await clickText('View pickup job #42');
+    await waitFor('!!document.querySelector("[data-testid=rider-dashboard-panel]")');
+    assert.equal(await evaluate('!!document.querySelector("[data-testid=new-job-badge-42]")'),false);
+    await waitFor('document.querySelector("[data-testid=rider-dashboard-badge]")?.innerText==="1"');
+    await clickText('Close Pickup · Order #42');
+    await waitFor('!document.querySelector("[data-testid=rider-dashboard-panel]")');
+    await clickText('View delivery job #43');
+    await waitFor('!!document.querySelector("[data-testid=rider-dashboard-panel]")');
+    await waitFor('!document.querySelector("[data-testid=rider-dashboard-badge]")');
+    await clickText('Close Delivery · Order #43');
+    await waitFor('!document.querySelector("[data-testid=rider-dashboard-panel]")');
+    await pause(300);
+    await visit('/rider',390,'2 jobs');
+    assert.equal(await evaluate('document.querySelectorAll("[data-testid^=new-job-badge-]").length'),0,'Viewed cards remain read after reload');
+    assert.ok(!(await evaluate('document.querySelector("[data-testid=rider-dashboard-tab]").innerText')).includes('2'),'Dashboard badge clears after viewing every job');
+    console.log('PASS rider new-job toasts, read state, persistent card badges, unseen Dashboard count and 9+ cap');
     return;
   }
   if (pullTest) {
@@ -1092,7 +1208,7 @@ async function clickText(text) {
     await clickText('Open rider tools');
     await waitFor(panelRest);
     const drawer=await evaluate('(()=>{const r=document.querySelector("[data-testid=rider-dashboard-panel]").getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height}})()');
-    assert.equal(drawer.right,1440); assert.equal(drawer.width,400); assert.equal(drawer.height,1000);
+    assert.ok(Math.abs(drawer.right-1440)<0.5); assert.equal(drawer.width,400); assert.equal(drawer.height,1000);
     await pause(250);
     const drawerShot=await command('Page.captureScreenshot',{format:'png'});
     fs.writeFileSync(path.join(artifacts,'rider-tools-drawer-desktop.png'),Buffer.from(drawerShot.data,'base64'));
@@ -1310,7 +1426,8 @@ async function clickText(text) {
       await evaluate(`(()=>{const e=document.querySelector('input[aria-label="'+${JSON.stringify(label)}+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     }
     await input('Service Name','Compact Test'); await input('Weight per load','8'); await input('Price per load','255');
-    await input('Standard washing time','30'); await input('Standard drying time','45');
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="Washing time (optional)"]').getAttribute('aria-valuetext')`),'45 minutes');
+    assert.equal(await evaluate(`document.querySelector('input[aria-label="Drying time (optional)"]').getAttribute('aria-valuetext')`),'60 minutes');
     assert.equal(await evaluate(`document.querySelector('[aria-label="Service color #D0C1E8"]').getAttribute('aria-disabled')`),'true');
     assert.equal(await evaluate(`document.querySelector('[aria-label="Service color #321078"]').getAttribute('aria-disabled')`),'true');
     for(const color of ['#7EA8BE','#28536B','#5C374C','#052F5F']) assert.ok(await evaluate(`!!document.querySelector('[aria-label="Service color ${color}"]')`));
@@ -1318,15 +1435,18 @@ async function clickText(text) {
     await clickText('Service color #7EA8BE');
     await evaluate(`document.querySelector('[data-testid=service-editor-actions] [aria-label="Add Service"]').click()`);
     await waitFor(closed); await waitFor('!!document.querySelector("[data-testid=service-card-3]")');
-    assert.deepEqual(serviceWrites[0].body,{serviceName:'Compact Test',price:255,packageKilos:8,washingMinutes:30,dryingMinutes:45,color:'#7EA8BE'});
+    assert.deepEqual(serviceWrites[0].body,{serviceName:'Compact Test',price:255,packageKilos:8,washingMinutes:45,dryingMinutes:60,color:'#7EA8BE'});
     assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-testid=service-card-3]")).backgroundColor'),'rgb(126, 168, 190)');
     await evaluate('document.querySelector("[data-testid=service-card-3] [aria-label=Edit]").click()');
     await waitFor(editor); await checkFit(false);
     assert.equal(await evaluate(`document.querySelector('input[aria-label="Service Name"]').value`),'Compact Test');
     assert.notEqual(await evaluate(`document.querySelector('[aria-label="Service color #7EA8BE"]').getAttribute('aria-disabled')`),'true','Own color stays available while editing');
     await clickText('Price per kilogram'); await input('Price per kilogram','35'); await clickText('Service color #5C374C');
+    await input('Washing time (optional)','0'); await input('Drying time (optional)','0');
     await clickText('Save Changes'); await waitFor(closed);
     assert.equal(serviceWrites.at(-1).body.packageKilos,null);
+    assert.equal(serviceWrites.at(-1).body.washingMinutes,null);
+    assert.equal(serviceWrites.at(-1).body.dryingMinutes,null);
     assert.equal(serviceWrites.at(-1).body.color,'#5C374C');
     await clickText('Add Price Range'); await waitFor(editor);
     assert.equal(await evaluate('document.querySelectorAll("[data-testid=service-editor] input[type=range]").length'),2);
@@ -1706,26 +1826,109 @@ async function clickText(text) {
     await visit('/shop/transactions',390,'Wash & dry timers');
     user.isShopOwner = false;
     await visit('/activities',390,'Wash & dry timers','processing-timers-customer');
+    await waitFor('!!document.querySelector("[data-testid=customer-live-updates]")');
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("Washing your laundry")'));
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("Drying your laundry")'));
+    await clickText('Minimize live updates');
+    await waitFor('!document.querySelector("[data-testid=live-updates-content]")');
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=live-progress-ring]")'));
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=customer-live-updates]")'));
+    await clickText('Expand live updates');
+    await waitFor('!!document.querySelector("[data-testid=live-updates-content]")');
+    await clickText('View live order 43');
+    await waitFor('location.pathname.includes("/order/tracking/43")');
+    await visit('/activities',320,'Live laundry updates');
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'Live updates fits a narrow phone');
+    await visit('/activities',390,'Wash & dry timers');
     await clickText(`View order 43 from ${shops[0].shopName}`);
     await waitFor('document.body.innerText.includes("Step 3 of 5")&&!!document.querySelector("[data-testid=processing-timer]")');
     assert.ok(await evaluate('Array.from(document.querySelectorAll("[data-testid=processing-timer]")).filter(e=>e.getBoundingClientRect().width>0).some(e=>e.innerText.includes("Not started"))'));
     orders[1].workflowStatus = null;
     await visit('/activities',390,'Not started');
+    assert.ok(!(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText')).includes('Order #43'),'Unstarted laundry is excluded from live activities');
     // Expiry is an indicator; it must never write an order transition.
     orders[1].workflowStatus = 'Washing';
     orders[1].processingStartedAt = new Date(Date.now() - 60 * 60000).toISOString();
     await visit('/activities',390,'Time elapsed');
     assert.equal(orders[1].workflowStatus,'Washing');
     assert.equal(workflowWrites.length,0);
+    orders[0].workflowStatus='Folding'; orders[0].washingMinutes=null; orders[0].dryingMinutes=null;
+    orders[1].workflowStatus='ReadyForCollection';
+    await visit('/activities',390,'Your laundry is being folded');
+    assert.ok(!(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText')).includes('remaining'));
+    assert.equal(await evaluate('document.querySelectorAll("[data-testid^=live-countdown-]").length'),0);
+    await clickText('Minimize live updates');
+    await waitFor('!!document.querySelector("[data-testid=live-folding-icon]")');
+    assert.equal(await evaluate('!!document.querySelector("[data-testid=live-progress-ring]")'),false);
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("Your laundry is being folded")'));
+    await clickText('Expand live updates');
+    await clickText('View live order 42');
+    await waitFor('location.pathname.includes("/order/tracking/42")');
+    orders[0].status='Ready'; orders[0].workflowStatus='ReadyForDelivery'; orders[0].deliveryType='Deliver';
+    await visit('/activities',390,'Awaiting rider pickup');
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("at the laundry shop")'));
+    assert.equal(await evaluate('document.querySelectorAll("[data-testid^=live-countdown-]").length'),0);
+    await clickText('Minimize live updates');
+    await waitFor('!!document.querySelector("[data-testid=live-return-icon]")');
+    assert.equal(await evaluate('!!document.querySelector("[data-testid=live-progress-ring]")'),false);
+    user.isShopOwner=true;
+    await visit('/shop/transactions/shop-transaction?id=42',1440,'Awaiting rider pickup');
+    assert.ok(await evaluate('document.querySelector("[data-testid=order-step-content]").innerText.includes("at your shop")'));
+    orders[0].workflowStatus='DeliveryAccepted';
+    await visit('/shop/transactions/shop-transaction?id=42',1440,'Rider is on the way to the shop');
+    assert.ok(await evaluate('document.querySelector("[data-testid=order-step-content]").innerText.includes("claimed the delivery job")'));
+    user.isShopOwner=false;
+    await visit('/activities',390,'Rider is on the way to the shop');
+    await clickText('Minimize live updates');
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("Rider is on the way to the shop")'));
+    orders[0].handoff={kind:'collection',arrived:true,released:false};
+    await visit('/activities',390,'Rider arrived at the shop');
+    await clickText('Minimize live updates');
+    assert.ok(await evaluate('document.querySelector("[data-testid=customer-live-updates]").innerText.includes("Rider arrived at the shop")'));
+    user.isShopOwner=true;
+    orders[0].assignments=[{id:333,riderId:22,stage:'Delivery',status:'Accepted',rider:{id:22,name:'Alex Santos',phone:'09123456789',photoUrl:null}}];
+    await visit('/shop/transactions/shop-transaction?id=42',1440,'Rider arrived at the shop');
+    assert.ok(await evaluate('document.querySelector("[data-testid=order-step-content]").innerText.includes("Confirm the handover")'));
+    const riderInfo=await evaluate('document.querySelector("[data-testid=assigned-return-rider]").innerText');
+    assert.ok(riderInfo.includes('Alex Santos')&&riderInfo.includes('Rider ID #22')&&riderInfo.includes('09123456789'));
+    assert.ok(await evaluate('!!document.querySelector("[data-testid=rider-avatar-fallback]")'));
+    await evaluate('document.querySelector("[data-testid=assigned-return-rider] [aria-label=Call]").click()');
+    await waitFor('document.body.innerText.includes("Copy number")');
+    await clickText('Close contact');
+    await evaluate(`Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));`);
+    await pause(100);
+    notificationRecords.push({id:8001,transactionId:42,userId:7,audience:'partner',shopMode:true,title:'Rider arrived at the shop',message:'The rider has arrived at your shop. Confirm the handover.',createdAt:new Date().toISOString(),readAt:null});
+    await evaluate(`Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));`);
+    await waitFor('document.querySelector("[data-testid=toast-info]")?.innerText.includes("Rider arrived at the shop")');
+    const toastRect=await evaluate('(()=>{const r=document.querySelector("[data-testid=toast-info]").getBoundingClientRect();return {width:r.width,right:r.right};})()');
+    assert.equal(toastRect.width,440); assert.ok(Math.abs(toastRect.right-1416)<1,'Shop toast appears at top right after returning from the rider tab');
+    await clickText('Dismiss notification');
+    user.isShopOwner=false;
+    orders[0].workflowStatus='OutForDelivery';
+    await visit('/activities',390,'Laundry out for delivery');
     orders[0].workflowStatus='Completed'; orders[1].workflowStatus='ReadyForCollection';
     await visit('/activities',390,'Active Orders');
     assert.equal(await evaluate('document.querySelectorAll("[data-testid=processing-timer]").length'),0);
+    assert.equal(await evaluate('!!document.querySelector("[data-testid=customer-live-updates]")'),false);
     assert.deepEqual(errors,[]);
     console.log('PASS processing timers for shop and customer, ticking, actual phase starts, compact mode, legacy estimates, expiry and ready');
     return;
   }
   if (liveOperationsTest) {
+    await visit('/shop/home',1440,'Recent orders');
+    await clickText('Expand Orders');
+    await waitFor('!!document.querySelector("[data-testid=orders-submenu]")');
+    await clickText('Collapse Orders');
+    await waitFor('!document.querySelector("[data-testid=orders-submenu]")');
+    await clickText('Expand Orders');
+    await clickText('Live operations');
+    await waitFor('location.pathname==="/shop/operations"&&!!document.querySelector("[data-testid=live-operations-board]")');
+    await clickText('Open live order 42, Test Customer With A Long Name');
+    await waitFor('location.pathname==="/shop/operations/shop-transaction"&&!!document.querySelector("[data-testid=order-step-indicator]")');
+    await clickText('Back');
+    await waitFor('location.pathname==="/shop/operations"');
     await visit('/shop/home',390,'Recent orders');
+    assert.equal(await evaluate(`document.querySelector('[aria-label="Live operations"]').innerText`),'', 'Mobile header action uses only an icon');
     await clickText('Live operations');
     await waitFor('location.pathname==="/shop/home/shop-live-operations"&&!!document.querySelector("[data-testid=live-operations-board]")');
     assert.equal(await evaluate('document.querySelectorAll("[data-testid^=live-stage-]").length'),5);
@@ -1874,7 +2077,7 @@ async function clickText(text) {
   await waitFor('!!document.querySelector("[role=progressbar]")'); console.log('PASS loading indicator');
   fs.writeFileSync(path.join(artifacts,'verification.txt'),'Chrome production UI checks passed.\nViewports: 320, 390, 768, 1440.\nBoth themes, shared flows, long text, search, filters, service dialog, order review, loading, empty and error states verified with intercepted fixtures.\nLive API, native maps, geolocation permission and physical-device behavior require device verification.\n');
   console.log('Application console warnings/errors:', JSON.stringify([...consoleMessages]));
-})().catch(error => { console.error(error);process.exitCode=1; }).finally(async () => {
+})().catch(error => { console.error(error); if(errors.length) console.error('Browser errors:',JSON.stringify(errors)); process.exitCode=1; }).finally(async () => {
   closing = true;
   for (const item of pending.values()) { clearTimeout(item.timer); item.resolve({}); }
   pending.clear();

@@ -14,6 +14,10 @@ export type TimerPhase = {
   seconds: number | null;
   progress: number;
 };
+export function timerPercent(phase: TimerPhase) {
+  const percent = Math.floor(Math.max(0, Math.min(1, phase.progress)) * 100);
+  return phase.state === "running" ? Math.min(99, percent) : percent;
+}
 export function processingIsActive(order: ProcessingTimingOrder) {
   return order.workflowStatus ? ["Washing", "Drying", "Folding"].includes(order.workflowStatus) : order.status === "Processing";
 }
@@ -47,6 +51,14 @@ export function timerClock(seconds: number) {
   const minutes = Math.floor(whole % 3600 / 60);
   const rest = String(whole % 60).padStart(2, "0");
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+}
+// A processing status alone does not mean a machine has actually started.
+export function activeMachinePhase(order: ProcessingTimingOrder, now: number) {
+  if (["Completed", "Cancelled"].includes(order.status) || order.workflowStatus === "Folding") return null;
+  const timers = processingTimers(order, now);
+  const drying = order.workflowStatus === "Drying" || (!order.workflowStatus && !!order.dryingStartedAt);
+  const phase = timers?.phases[drying ? 1 : 0];
+  return phase && ["running", "elapsed"].includes(phase.state) ? phase : null;
 }
 export function timerPhaseText(phase: TimerPhase) {
   if (phase.state === "done") return "Finished";
