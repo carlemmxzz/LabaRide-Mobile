@@ -80,7 +80,7 @@ export function RiderAvailableJobsDesign() {
     if (pending.current || !canClaim) return;
     pending.current = true; setClaimingId(job.id); setError(''); setPanel(null);
     try {
-      const confirmed = await confirmAction(`Claim ${job.stage.toLowerCase()} job #${job.id}?`, `Collect from ${job.pickupArea} and take the laundry to ${job.dropoffArea}. Claiming accepts this job immediately and adds it to My jobs.`, { confirmLabel: 'Claim job' });
+      const confirmed = await confirmAction(`Claim ${job.stage.toLowerCase()} job #${job.id}?`, `Collect from ${job.pickupArea} and take the laundry to ${job.dropoffArea}. Claiming accepts this job immediately and adds it to My deliveries.`, { confirmLabel: 'Claim job' });
       if (!confirmed) return;
       setBusy(true);
       await api.put(`/delivery/orders/${job.id}/claim`, { stage: job.stage, expectedVersion: job.workflowVersion });
@@ -92,7 +92,7 @@ export function RiderAvailableJobsDesign() {
   }
   return <Screen header={<RiderHeader />} back={false}>
     <View style={{ gap: 14 }}>
-      <View style={styles.between}><Txt style={styles.heading}>Available jobs</Txt><View style={{ flexDirection: 'row', gap: 4 }}>
+      <View style={styles.between}><Txt style={styles.heading}>Order requests</Txt><View style={{ flexDirection: 'row', gap: 4 }}>
     <IconButton label="Refresh jobs" onPress={() => { if (!query.isFetching) void query.refetch(); }}>{query.isFetching ? <ActivityIndicator size="small" color={palette.primary} /> : <RefreshCw size={20} color={palette.primary} />}</IconButton>
     <IconButton label="Open rider tools" onPress={() => setPanel('tools')}><Menu size={21} color={palette.primary} /></IconButton>
   </View></View>
@@ -111,7 +111,7 @@ export function RiderAvailableJobsDesign() {
             </View>
             <Button title={board.rider.online ? 'Go offline' : 'Go online'} compact outline={board.rider.online} busy={busy && claimingId === null} disabled={claimingId !== null} onPress={() => { void availability(!board.rider.online); }} />
           </View>
-          {board.rider.online && board.rider.workload >= board.rider.capacity && <Txt style={{ color: palette.warning, fontSize: 12 }}>Your job slots are full. Finish a job in My jobs to claim another.</Txt>}
+          {board.rider.online && board.rider.workload >= board.rider.capacity && <Txt style={{ color: palette.warning, fontSize: 12 }}>Your job slots are full. Finish a job in My deliveries to claim another.</Txt>}
         </Card>
         {board.rider.online && <>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -156,7 +156,7 @@ export function RiderAvailableJobsDesign() {
         </Card>)}
       </View>}
       {board && !query.isError && (!board.rider.online ? <Empty title="Go online to receive jobs" message="Pickup and delivery jobs appear here when you are online." />
-        : !jobs.length ? <Empty title={filter === 'All' ? 'No available jobs right now' : `No ${filter.toLowerCase()} jobs right now`} message={filter === 'All' ? 'Confirmed pickups and laundry ready for rider delivery appear here.' : 'Try All to see other available jobs.'}
+        : !jobs.length ? <Empty title={filter === 'All' ? 'No order requests right now' : `No ${filter.toLowerCase()} jobs right now`} message={filter === 'All' ? 'Confirmed pickups and laundry ready for rider delivery appear here.' : 'Try All to see other order requests.'}
           {...(filter !== 'All' ? { action: 'Show all jobs', onPress: () => setFilter('All') } : {})} /> : null)}
     </View>
     {panel === 'tools' && <RiderDashboardPanel title="Rider tools" drawer onClose={() => setPanel(null)}
@@ -192,7 +192,7 @@ export function RiderAvailableJobsDesign() {
         </View>)}
         {!!schedule(selectedJob) && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Clock3 size={17} color={palette.primary} /><View><Txt style={{ color: palette.muted, fontSize: 12 }}>{selectedJob.requestedPickupAt ? 'Requested pickup' : 'Service schedule'}</Txt><Txt>{schedule(selectedJob)}</Txt></View></View>}
         <Txt style={{ color: palette.muted, fontSize: 12 }}>Booked {new Date(selectedJob.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} (PHT)</Txt>
-        <Txt style={{ color: palette.muted, fontSize: 12 }}>The map uses saved pickup and destination pins. Customer contacts and written addresses unlock in My jobs after claiming.</Txt>
+        <Txt style={{ color: palette.muted, fontSize: 12 }}>The map uses saved pickup and destination pins. Customer contacts and written addresses unlock in My deliveries after claiming.</Txt>
       </> : <Empty title="This job is no longer available" message="Refresh the dashboard to check for other jobs." />}
     </RiderDashboardPanel>}
   </Screen>;

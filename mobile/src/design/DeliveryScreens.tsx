@@ -366,7 +366,7 @@ export function RiderDashboardDesign({ history = false, orderId }: { history?: b
   </View>;
   return <Screen header={<RiderHeader />} back={false}>
     <View style={styles.stack}>
-      <View><Txt style={styles.title}>{history ? 'Your delivery record' : 'My jobs'}</Txt><Txt style={styles.muted}>{history ? 'Completed trips and assignment outcomes.' : 'Keep laundry moving, one handoff at a time.'}</Txt></View>
+      <View><Txt style={styles.title}>{history ? 'Your delivery record' : 'My deliveries'}</Txt><Txt style={styles.muted}>{history ? 'Completed trips and assignment outcomes.' : 'Keep laundry moving, one handoff at a time.'}</Txt></View>
       <State query={query} />
       {!history && <RiderLocationSharingControl />}
       {!history && query.data && <>
@@ -378,13 +378,13 @@ export function RiderDashboardDesign({ history = false, orderId }: { history?: b
       </>}
       {!!command.error && !decision && <Txt accessibilityRole="alert" style={{ color: palette.danger }}>{command.error}</Txt>}
       {orderId ? <Section title={'Order #' + orderId} action="Show all jobs" onPress={() => router.replace('/rider/jobs')} /> : <TabsRow items={['All', 'Pickup', 'Delivery']} value={filter} onChange={setFilter} />}
-      <View style={{ gap: 5 }}><Txt style={styles.heading}>{history ? 'Past assignments' : 'Your assignments'} ({shown.length})</Txt><Txt style={styles.muted}>Select an order card for full details, trip progress, maps and handover photos.</Txt></View>
+      <View style={{ gap: 5 }}><Txt style={styles.heading}>{history ? 'Past assignments' : 'My deliveries'} ({shown.length})</Txt><Txt style={styles.muted}>Select an order card for full details, trip progress, maps and handover photos.</Txt></View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: 16 }}>
         {shown.map(job => <Pressable key={job.id} testID={`rider-job-card-${job.id}`} accessibilityRole="button" accessibilityLabel={`View ${job.stage.toLowerCase()} order #${job.transactionId} details`} onPress={() => { command.setError(''); setSelectedId(job.id); }} style={({ pressed }) => ({ width: width >= 900 ? '48.8%' : '100%', opacity: pressed ? 0.8 : 1 })}>
           <RiderJobSummary job={job} />
         </Pressable>)}
       </View>
-      {!query.isLoading && !query.error && !shown.length && <Empty title={history ? 'No past jobs yet' : 'No active jobs yet'} message={history ? 'Your job outcomes will appear here.' : 'Go online and claim a pickup or delivery from Available Jobs.'} action={history ? undefined : 'Browse available jobs'} onPress={history ? undefined : () => router.push('/rider/available')} />}
+      {!query.isLoading && !query.error && !shown.length && <Empty title={history ? 'No past jobs yet' : 'No active deliveries yet'} message={history ? 'Your job outcomes will appear here.' : 'Go online and claim a pickup or delivery from Order requests.'} action={history ? undefined : 'Browse order requests'} onPress={history ? undefined : () => router.push('/rider/available')} />}
     </View>
     <ActionModal visible={selectedId !== null && (!decision || inlineDecision)} maxWidth={900} contentKey={navigationStop === null ? 'details' : 'route-' + navigationStop} close={closeDetails}>
       <View style={styles.between}><Txt accessibilityRole="header" style={styles.title}>Order details</Txt><IconButton label="Close order details" onPress={closeDetails}><X size={22} color={palette.ink} /></IconButton></View>
@@ -464,7 +464,7 @@ export function OperationsDashboardDesign() {
   return <Screen title="Delivery Operations" brandedHeader back={false}>
     <View style={styles.stack}>
       <View style={styles.between}>
-        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Delivery Operations</Txt><Txt style={styles.muted}>Monitor deliveries, review riders, and resolve issues. Riders claim available jobs themselves.</Txt></View>
+        <View style={{ flex: 1, minWidth: 180, gap: 4 }}><Txt style={styles.title}>Delivery Operations</Txt><Txt style={styles.muted}>Monitor deliveries, review riders, and resolve issues. Riders claim order requests themselves.</Txt></View>
         <Button title="Sign Out" outline onPress={logout} />
       </View>
       <State query={query} />
