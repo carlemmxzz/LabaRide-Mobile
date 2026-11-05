@@ -27,16 +27,11 @@ function fixture(status = 'PickupEnRoute', stage = 'Pickup') {
   return { order, events, notifications, act };
 }
 
-test('booking confirmation accepts a short nonblank explanation and keeps other reason requirements', async () => {
+test('booking confirmation needs no explanation and keeps issue reason requirements', async () => {
   const f = fixture('BookingPending'); f.order.assignments = [];
-  for (const note of [undefined, '', '   ']) {
-    const error = await f.act(2, 'confirmBooking', 0, { note });
-    assert.match(error.errors[0].message, /acceptance explanation/);
-    assert.equal(f.events.length, 0);
-  }
-  assert.equal(await f.act(2, 'confirmBooking', 0, { note: '  ok  ' }), undefined);
+  assert.equal(await f.act(2, 'confirmBooking', 0), undefined);
   assert.equal(f.order.workflowStatus, 'PickupQueued');
-  assert.equal(f.events[0].detail, 'ok');
+  assert.ok(!f.events[0].detail?.includes('undefined'));
   const issue = await f.act(2, 'issue', f.order.workflowVersion, { note: 'ok' });
   assert.match(issue.errors[0].message, /at least 5/);
   assert.equal(f.events.length, 1);
@@ -59,14 +54,19 @@ test('customer pickup requires rider arrival, customer handover, then rider rece
   assert.equal(await f.act(3, 'receiveHandoff'), undefined);
   assert.equal(f.order.workflowStatus, 'LaundryPickedUp');
   assert.equal(f.order.assignments[0].status, 'Accepted');
-  assert.ok(f.notifications.some(item => item.audience === 'customer' && item.title.includes('Rider arrived')));
-  assert.ok(f.notifications.some(item => item.audience === 'rider' && item.title.includes('Handover confirmed')));
+  assert.ok(f.notifications.some(item => item.audience === 'customer' && item.title === 'Your pickup rider has arrived'));
+  assert.ok(f.notifications.some(item => item.audience === 'rider' && item.title === 'Customer confirmed handover'));
 });
 
 test('shop collection and final delivery follow the appropriate counterpart confirmation', async () => {
   for (const [status, counterpart, result] of [['DeliveryAccepted', 2, 'CleanLaundryCollected'], ['OutForDelivery', 1, 'Completed']]) {
     const f = fixture(status, 'Delivery');
     assert.equal(await f.act(3, 'arriveHandoff'), undefined);
+    if(status==='DeliveryAccepted') {
+      assert.equal(f.notifications.find(item=>item.shopMode).title,'Rider arrived at the shop');
+      assert.match(f.notifications.find(item=>item.shopMode).message,/Hand over the clean laundry/);
+      assert.match(f.notifications.find(item=>item.audience==='customer').message,/at the shop to collect your clean laundry/);
+    }
     assert.equal((await f.act(counterpart === 1 ? 2 : 1, 'releaseHandoff')).statusCode, 403);
     assert.equal(await f.act(counterpart, 'releaseHandoff'), undefined);
     assert.equal(await f.act(3, 'receiveHandoff'), undefined);

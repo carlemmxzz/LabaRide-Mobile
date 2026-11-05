@@ -63,19 +63,24 @@ const storage = createJSONStorage<DraftData>(() => Platform.OS === "web" ? {
 } : AsyncStorage);
 
 function draftData(state: Partial<DraftData>): DraftData {
-  return Object.fromEntries(Object.keys(emptyDraft).map(key => [key,
+  const data = Object.fromEntries(Object.keys(emptyDraft).map(key => [key,
     state[key as keyof DraftData] ?? emptyDraft[key as keyof DraftData],
   ])) as unknown as DraftData;
+  const ids = Array.isArray(data.serviceIds) ? data.serviceIds : [];
+  const selectedId = ids[0] ?? data.service?.id;
+  const service = data.shop?.services?.find(item => item.id === selectedId)
+    || (ids.length <= 1 && data.service?.id === selectedId ? data.service : null);
+  return { ...data, service, serviceIds: service ? [service.id] : [] };
 }
 
 export const useLaundryDraft = create<Draft>()(persist((set, get) => ({
   ...emptyDraft,
   set: (value) => set(value),
-  start: (shop, service, serviceIds) =>
+  start: (shop, service, _serviceIds) =>
     set({
       shop,
       service,
-      serviceIds,
+      serviceIds: [service.id],
       counts: {},
       notes: "",
       kilos: "",

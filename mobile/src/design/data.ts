@@ -71,6 +71,7 @@ export interface Shop extends AddressData {
   householdItems?: LaundryItem[];
 }
 export interface Order extends AddressData, ProcessingTimingOrder {
+  handoff?: { kind: string; arrived: boolean; released: boolean } | null;
   workflowStatus?: string | null;
   workflowVersion?: number;
   id: number;

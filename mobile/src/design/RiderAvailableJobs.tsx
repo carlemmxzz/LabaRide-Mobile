@@ -1,7 +1,7 @@
 import { toast } from "./toast-service";
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { Bike, ChevronRight, Clock3, MapPin, Menu, Package, RefreshCw, SlidersHorizontal } from 'lucide-react-native';
@@ -12,9 +12,12 @@ import { RiderLocationSharingControl } from './RiderLocationSharing';
 import { Button, Card, Choice, Empty, IconButton, Screen, TabsRow, Txt, styles, usePalette } from './ui';
 import { RiderDashboardPanel } from './RiderDashboardPanel';
 import { JobRoutePreview } from './JobRoutePreview';
+import { useAvailableRiderJobs } from './useRiderJobUpdates';
+import { useRiderJobSeenStore } from '../store/riderJobSeenStore';
+import { riderJobKey } from './rider-job-updates';
 
 type AvailableJob = { id: number; stage: 'Pickup' | 'Delivery'; workflowVersion: number; serviceName: string; kilos: string; scheduledDate: string | null; scheduledTime: string | null; requestedPickupAt?: string | null; createdAt: string; shopName: string; pickupArea: string; dropoffArea: string; distanceKm: number | null };
-type JobBoard = { rider: { online: boolean; workload: number; capacity: number; hasPosition: boolean }; limit: number; jobs: AvailableJob[] };
+export type JobBoard = { rider: { online: boolean; workload: number; capacity: number; hasPosition: boolean }; limit: number; jobs: AvailableJob[] };
 function schedule(job: AvailableJob) {
   if (job.requestedPickupAt) return new Date(job.requestedPickupAt).toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   if (!job.scheduledDate || !job.scheduledTime) return null;
@@ -24,7 +27,9 @@ function schedule(job: AvailableJob) {
 
 export function RiderAvailableJobsDesign() {
   const user = useAuthStore(state => state.user);
-  const query = useQuery({ queryKey: ['delivery', 'available-jobs', user?.id], queryFn: () => api.get<JobBoard>('/delivery/available-jobs'), refetchInterval: 15000 });
+  const seen = useRiderJobSeenStore(state => user ? state.seenByRider[user.id] : undefined);
+  const markSeen = useRiderJobSeenStore(state => state.markSeen);
+  const query = useAvailableRiderJobs();
   const cache = useQueryClient();
   const logout = useLogout();
   const palette = usePalette();
@@ -41,7 +46,7 @@ export function RiderAvailableJobsDesign() {
   const board = query.data;
   const selectedJob = board?.jobs.find(job => job.id === selectedJobId);
   const distance = (job: AvailableJob) => job.distanceKm == null ? 'Distance unavailable' : job.distanceKm < 0.1 ? 'Less than 0.1 km away' : `${job.distanceKm.toFixed(1)} km away`;
-  function viewJob(job: AvailableJob) { setSelectedJobId(job.id); setPanel('job'); }
+  function viewJob(job: AvailableJob) { if (user) markSeen(user.id, job); setSelectedJobId(job.id); setPanel('job'); }
   const canClaim = !!board?.rider.online && board.rider.workload < board.rider.capacity && !query.isError;
   const jobs = (board?.jobs || []).filter(job => filter === 'All' || job.stage === filter).sort((a, b) => sort === 'Nearest first' ? (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) || Date.parse(a.createdAt) - Date.parse(b.createdAt) : Date.parse(a.createdAt) - Date.parse(b.createdAt));
   async function refreshAll() {
@@ -137,7 +142,9 @@ export function RiderAvailableJobsDesign() {
                 {job.stage === 'Pickup' ? <Bike size={14} color={palette.primary} /> : <Package size={14} color={palette.primary} />}
                 <Txt style={{ color: palette.primary, fontWeight: '600', fontSize: 11 }}>{job.stage}</Txt>
               </View>
-              <Txt style={{ flex: 1, color: palette.muted, fontSize: 12, fontWeight: '600' }}>#{job.id}</Txt><ChevronRight size={17} color={palette.primary} />
+              <Txt style={{ flex: 1, color: palette.muted, fontSize: 12, fontWeight: '600' }}>#{job.id}</Txt>
+              {!seen?.[riderJobKey(job)] && <View testID={`new-job-badge-${job.id}`} accessibilityLabel="New job" style={{ minWidth: 30, height: 18, borderRadius: 9, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DC2626' }}><Txt style={{ color: 'white', fontSize: 10, lineHeight: 14, fontWeight: '700' }}>New</Txt></View>}
+              <ChevronRight size={17} color={palette.primary} />
             </View>
             <View style={{ gap: 2 }}><Txt numberOfLines={1} style={{ fontSize: 16, fontWeight: '700' }}>{job.shopName}</Txt><Txt numberOfLines={1} style={{ color: palette.muted, fontSize: 12 }}>{job.serviceName} · {job.kilos} kg</Txt></View>
             <View style={{ gap: 4 }}>{[['From', job.pickupArea], ['To', job.dropoffArea]].map(([label, area]) => <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -146,7 +153,7 @@ export function RiderAvailableJobsDesign() {
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: palette.line, paddingTop: 8 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}><MapPin size={13} color={palette.muted} /><Txt style={{ color: palette.muted, fontSize: 11 }}>{distance(job)}</Txt></View>
-            <Button title="Claim" accessibilityLabel={`Claim ${job.stage.toLowerCase()} job #${job.id}`} compact busy={claimingId === job.id} disabled={!canClaim || claimingId !== null || busy} onPress={() => { void claim(job); }} />
+            <Button title="Claim" accessibilityLabel={`Claim ${job.stage.toLowerCase()} job #${job.id}`} compact busy={claimingId === job.id} disabled={!canClaim || claimingId !== null || busy} onPress={() => { if (user) markSeen(user.id, job); void claim(job); }} />
           </View>
         </Card>)}
       </View>}

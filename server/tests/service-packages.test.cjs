@@ -68,6 +68,17 @@ test('only the owner can delete a service belonging to the specified shop', asyn
   }
 });
 
+test('services allow either or both timers to be explicitly disabled', async () => {
+  for (const method of ['addService', 'updateService']) {
+    for (const times of [{ washingMinutes: null, dryingMinutes: null }, { washingMinutes: 45, dryingMinutes: null }, { washingMinutes: null, dryingMinutes: 60 }]) {
+      const result = await invoke({ method, body: { serviceName: 'Optional timers', price: 25, ...times } });
+      assert.equal(result.error, undefined);
+      assert.equal(result.row.washingMinutes, times.washingMinutes);
+      assert.equal(result.row.dryingMinutes, times.dryingMinutes);
+    }
+  }
+});
+
 test('another account cannot create or change shop package prices', async () => {
   for (const method of ['addService', 'updateService']) {
     const result = await invoke({ method, userId: 2 });

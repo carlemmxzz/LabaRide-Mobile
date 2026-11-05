@@ -34,7 +34,7 @@ const context = () => ({});
 context.keys = () => keys;
 const routes = getRoutes(context, { platform: "web", ignoreEntryPoints: true });
 const config = getReactNavigationConfig(routes, true);
-const tabs = ["home", "transactions", "services", "customers", "profile"];
+const tabs = ["home", "transactions", "operations", "services", "customers", "profile"];
 
 const targetFile = path.resolve(__dirname, "../src/navigation/flow-target.ts");
 const targetModule = new Module(targetFile, module);
@@ -89,7 +89,7 @@ for (const tab of tabs) {
   });
 }
 
-test("the four visible tab stacks and legacy Customers stack share the shop navigator", () => {
+test("the desktop tab stacks and legacy Customers stack share the shop navigator", () => {
   const shopLayout = routes.children.find((route) => route.route === "shop");
   assert.ok(shopLayout);
   assert.equal(shopLayout.contextKey, "./shop/_layout.tsx");
@@ -156,8 +156,8 @@ test("legacy shop flows resolve inside the shop shell", () => {
   }
 });
 
-test("live operations and its order details retain the originating Dashboard or Orders tab", () => {
-  for (const tab of ["home", "transactions"]) {
+test("live operations and its order details retain their originating shop tab", () => {
+  for (const tab of ["home", "transactions", "operations"]) {
     for (const flow of ["shop-live-operations", "shop-transaction"]) {
       const target = flowTarget(flow, { id: "42" }, ["shop", tab, "[flow]"]);
       assert.equal(target.pathname, `/shop/${tab}/[flow]`);

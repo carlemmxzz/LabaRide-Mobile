@@ -13,7 +13,9 @@ import { serviceAreaError, type ServiceArea } from '../utils/service-area';
 import { shopAvailability } from '../utils/shop-hours';
 import { confirmationCode, recordEvent } from '../services/dispatch.service';
 import { shopPhotoSelection, withShopPhoto } from '../utils/shop-photo';
-import { processingEventSelection, serviceProcessingTimes, serviceTimingSelection, withProcessingTiming } from '../utils/processing-timing';
+import { serviceProcessingTimes, serviceTimingSelection, withProcessingTiming } from '../utils/processing-timing';
+import { handoffListSelection, handoffSummary } from '../services/handoff.service';
+import { orderNotificationCopy } from '../utils/order-notification-copy';
 
 export class TransactionController {
   static async startTimer(req: AuthRequest, res: Response, next: NextFunction) {
@@ -139,10 +141,10 @@ export class TransactionController {
       const transactions = await prisma.transaction.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        include: { items: true, events: processingEventSelection, shop: { select: { id: true, shopName: true, address: true, contactNumber: true, photo: shopPhotoSelection, services: { select: serviceTimingSelection } } } }
+        include: { items: true, ...handoffListSelection, shop: { select: { id: true, shopName: true, address: true, contactNumber: true, photo: shopPhotoSelection, services: { select: serviceTimingSelection } } } }
       });
 
-      return sendSuccess(res, transactions.map(({ collectionCode, shop: { services, ...shop }, events, ...order }) => ({ ...withProcessingTiming(order, services, events), shop: withShopPhoto(shop) })), 'User transactions retrieved');
+      return sendSuccess(res, transactions.map(({ collectionCode, shop: { services, ...shop }, events, assignments, ...order }) => ({ ...withProcessingTiming(order, services, events), handoff: handoffSummary({ ...order, assignments }, events), shop: withShopPhoto(shop) })), 'User transactions retrieved');
     } catch (error) {
       next(error);
     }
@@ -159,10 +161,10 @@ export class TransactionController {
       const transactions = await prisma.transaction.findMany({
         where: { shopId },
         orderBy: { createdAt: 'desc' },
-        include: { items: true, events: processingEventSelection }
+        include: { items: true, ...handoffListSelection }
       });
 
-      return sendSuccess(res, transactions.map(({ pickupCode, deliveryCode, events, ...order }) => withProcessingTiming(order, shop.services, events)), 'Shop transactions retrieved');
+      return sendSuccess(res, transactions.map(({ pickupCode, deliveryCode, events, assignments, ...order }) => ({ ...withProcessingTiming(order, shop.services, events), handoff: handoffSummary({ ...order, assignments }, events) })), 'Shop transactions retrieved');
     } catch (error) {
       next(error);
     }
@@ -199,10 +201,7 @@ export class TransactionController {
         return sendError(res, 'Accept the order before confirming its requested pickup.', 'CONFLICT', 409);
       }
       const accepting = existing.status === 'Pending' && status === 'Accepted';
-      if (accepting && !acceptanceExplanation) {
-        return sendError(res, 'Enter an explanation before accepting this order', 'ACCEPTANCE_EXPLANATION_REQUIRED', 400);
-      }
-      const savedNotes = accepting
+      const savedNotes = accepting && acceptanceExplanation
         ? [existing.notes, `Shop acceptance: ${acceptanceExplanation}`].filter(Boolean).join('\n\n')
         : notes || undefined;
       const now = new Date();
@@ -222,19 +221,12 @@ export class TransactionController {
         },
         });
         if (result.count && (existing.status !== status || estimatedReadyAt || confirmPickup)) {
-          const titles: Record<string, string> = { Accepted: 'Order accepted', Queued: 'Laundry received', Processing: 'Processing started', Ready: 'Laundry ready', Completed: 'Order completed', Cancelled: 'Order cancelled' };
-          const readyEstimate = estimatedReadyAt ? new Date(estimatedReadyAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + ' (Philippine time)' : '';
-          const title = existing.status !== status ? titles[status] || 'Order updated' : estimatedReadyAt ? 'Ready estimate updated' : 'Laundry pickup confirmed';
-          const message = [
-            `Order #${transactionId} is now ${status.toLowerCase()}.`,
-            accepting ? `Shop acceptance: ${acceptanceExplanation}` : notes,
-            readyEstimate ? `Estimated ready: ${readyEstimate}.` : '',
-            estimatedReadyAt && estimateReason ? `Reason: ${estimateReason}` : '',
-            confirmPickup ? 'The shop confirmed your requested laundry pickup.' : '',
-          ].filter(Boolean).join(' ');
+          const copy = (audience: 'customer' | 'partner') => confirmPickup && existing.status === status && !estimatedReadyAt
+            ? {title: audience === 'customer' ? 'Your pickup time is confirmed' : 'Pickup schedule confirmed', message: `Order #${transactionId}: ${audience === 'customer' ? 'The shop confirmed your requested laundry pickup.' : 'The customer can see the confirmed pickup time.'}`}
+            : orderNotificationCopy({audience,orderId:transactionId,action:estimatedReadyAt?'ReadyEstimateUpdated':'',status});
           await tx.notification.createMany({ data: [
-            { userId: existing.userId, transactionId, shopMode: false, title, message },
-            { userId: existing.shop.userId, transactionId, shopMode: true, title, message },
+            { userId: existing.userId, transactionId, shopMode: false, ...copy('customer') },
+            { userId: existing.shop.userId, transactionId, shopMode: true, ...copy('partner') },
           ] });
         }
         return result;

@@ -10,10 +10,10 @@ import { flutterAssets } from "./assets";
 import { interfaceIcons } from "./icons";
 import { usePalette } from "./theme";
 import { useWebAccessibility } from "./web-accessibility";
+import { BrandMark } from './BrandMark';
 import type { Service } from "./data";
 export { usePalette } from "./theme";
 type AssetName = keyof typeof flutterAssets | keyof typeof interfaceIcons;
-const brandBlue = '#2457AD';
 
 export const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -45,8 +45,8 @@ export function Asset({ name, size = 24, style, tint }: { name: AssetName; size?
 export function Brand({ white = false, compact = false }: { white?: boolean; compact?: boolean }) {
   const palette = usePalette();
   return <View style={[styles.row, compact ? undefined : styles.center]}>
-    <Asset name={white ? "whitelogo.png" : "blacklogo.png"} size={40} />
-    {!compact && <Txt style={{ fontSize: 26, fontWeight: "700", color: white ? "white" : brandBlue }}>LabaRide</Txt>}
+    <BrandMark size={56} white={white} />
+    {!compact && <Txt testID="brand-wordmark" style={{ fontSize: 26, fontWeight: "700", color: white ? "white" : palette.primary }}>LabaRide</Txt>}
   </View>;
 }
 export function Button({ title, onPress, busy, disabled, color, textColor, outline = false, round = false, compact = false, icon, style, accessibilityLabel }: {
@@ -92,17 +92,17 @@ export function Field({ label, password = false, suffix, style, appearance = "ou
     </View>
   </View>;
 }
-export function Header({ title, dark = false, back = true, right, branded = false }: { title: string; dark?: boolean; back?: boolean; right?: React.ReactNode; branded?: boolean }) {
+export function Header({ title, dark = false, back = true, right, branded = false, maxWidth = 1200 }: { title: string; dark?: boolean; back?: boolean; right?: React.ReactNode; branded?: boolean; maxWidth?: number }) {
   const palette = usePalette();
   const segments = useSegments() as string[];
   const home = segments[0] === "shop" ? "/shop/home" : "/(user)/home";
   return <View style={{ backgroundColor: dark ? palette.primary : "white", borderBottomWidth: 1, borderBottomColor: palette.line }}>
-    <View style={{ width: "100%", maxWidth: 1200, alignSelf: "center", minHeight: 72, paddingHorizontal: 20, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+    <View style={{ width: "100%", maxWidth, alignSelf: "center", minHeight: 72, paddingHorizontal: maxWidth > 1200 ? 32 : 20, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
       {back && <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.canGoBack() ? router.back() : router.replace(home)}
         style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><ArrowLeft size={22} color={dark ? "white" : palette.primary} /></Pressable>}
       {branded ? <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Asset name={dark ? 'whitelogo.png' : 'blacklogo.png'} size={36} style={{ flexShrink: 0 }} />
-        <View style={{ flex: 1, minWidth: 0, gap: 1 }}><Txt numberOfLines={1} style={{ fontSize: 20, lineHeight: 26, fontWeight: '700', color: dark ? 'white' : brandBlue }}>LabaRide</Txt><Txt accessibilityRole="header" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18, color: dark ? 'white' : palette.muted }}>{title}</Txt></View>
+        <BrandMark size={48} white={dark} />
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}><Txt testID="brand-wordmark" numberOfLines={1} style={{ fontSize: 20, lineHeight: 26, fontWeight: '700', color: dark ? 'white' : palette.primary }}>LabaRide</Txt><Txt accessibilityRole="header" numberOfLines={1} style={{ fontSize: 12, lineHeight: 18, color: dark ? 'white' : palette.muted }}>{title}</Txt></View>
       </View> : <Txt accessibilityRole="header" style={{ flex: 1, fontSize: 22, fontWeight: "700", color: dark ? "white" : palette.ink }}>{title}</Txt>}{right}
     </View>
   </View>;
@@ -123,7 +123,7 @@ export function Screen({ title, children, footer, dark, background, back = true,
   return <SafeAreaView style={{ flex: 1, backgroundColor: darkHeader ? palette.primary : background || palette.surface }} edges={inTab ? ["top", "left", "right"] : ["top", "left", "right", "bottom"]}>
     <StatusBar style={darkHeader ? "light" : "dark"} />
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: background || palette.surface }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      {!!title && <Header title={title} dark={darkHeader} back={back} right={right} branded={brandedHeader} />}
+      {!!title && <Header title={title} dark={darkHeader} back={back} right={right} branded={brandedHeader} maxWidth={maxWidth} />}
       {scroll ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={content} showsVerticalScrollIndicator={false}>{children}</ScrollView> : <View style={[content, { flex: 1 }]}>{children}</View>}
       {footer && <View style={{ backgroundColor: "white", borderTopWidth: 1, borderTopColor: palette.line }}><View style={{ width: "100%", maxWidth: 1200, alignSelf: "center", padding: 20 }}>{footer}</View></View>}
     </KeyboardAvoidingView>
@@ -142,7 +142,7 @@ export function Section({ title, action, onPress, light = false }: { title: stri
 export function MenuRow({ title, detail, asset, onPress, color }: { title: string; detail?: string; asset?: AssetName; onPress?: () => void; color?: string }) {
   const palette = usePalette();
   const accent = color || palette.primary;
-  return <Pressable accessibilityRole={onPress ? "button" : undefined} disabled={!onPress} onPress={onPress}
+  return <Pressable accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={onPress ? title : undefined} accessibilityHint={onPress ? detail : undefined} disabled={!onPress} onPress={onPress}
     style={({ pressed }) => [styles.row, { minHeight: 64, padding: 16, borderWidth: 1, borderColor: palette.line, borderRadius: 12, backgroundColor: pressed ? palette.soft : "white" }]}>
     {asset && <Asset name={asset} tint={accent} />}<View style={styles.grow}><Txt style={{ fontWeight: "600", color: accent }}>{title}</Txt>{!!detail && <Txt style={[styles.muted, { marginTop: 4 }]}>{detail}</Txt>}</View>
     {onPress && <ChevronRight size={18} color={palette.muted} />}

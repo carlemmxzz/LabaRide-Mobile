@@ -7,6 +7,7 @@ import { api, go } from "./data";
 import { useAuthStore } from "../store/authStore";
 import { notificationTracker } from "./notification-toast-state";
 import { toast } from "./toast-service";
+import { notificationCopy } from './notification-copy';
 
 export interface Notification {
   id: number; transactionId: number; title: string; message: string;
@@ -22,6 +23,7 @@ export function useNotifications(scope: NotificationScope, poll = false) {
   return useQuery({
     queryKey: notificationQueryKey(userId, scope), enabled: !!userId,
     queryFn: () => api.get<Notification[]>(`/notifications?${notificationScopeQuery(scope)}`),
+    select: items => items.map(item => notificationCopy(item, scope)),
     staleTime: 15000, refetchInterval: poll ? 15000 : false, refetchIntervalInBackground: false,
   });
 }
@@ -81,8 +83,10 @@ export function useNotificationToasts() {
   }, [foreground, key]);
   const revision = useSyncExternalStore(notificationTracker.subscribe, notificationTracker.getSnapshot, notificationTracker.getSnapshot);
   useEffect(() => {
-    if (!userId || !query.data || query.isFetching || query.isError || resuming.current || notificationTracker.hasPending()) return;
-    const fresh = notificationTracker.receive(key, userId, query.data, foreground, resumeBaseline.current);
+    if (!foreground || !userId || !query.data || query.isFetching || query.isError || resuming.current || notificationTracker.hasPending()) return;
+    // Keep the existing baseline when returning to this tab: notifications that
+    // arrived while the owner was looking at the rider app still need a toast.
+    const fresh = notificationTracker.receive(key, userId, query.data, true);
     if (foreground) resumeBaseline.current = false;
     for (const item of fresh) {
       const open = () => openNotificationOrder(item, scope);

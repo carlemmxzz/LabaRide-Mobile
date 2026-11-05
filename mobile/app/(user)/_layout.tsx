@@ -3,6 +3,10 @@ import { View, useWindowDimensions } from "react-native";
 import { Tabs, useSegments } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Asset, Brand, Txt, usePalette } from "../../src/design/ui";
+import { workspaceSidebar } from '../../src/navigation/WorkspaceSidebar';
+import { ClipboardList, House, UserRound } from 'lucide-react-native';
+import { BottomTabBar } from 'expo-router/tabs';
+import { CustomerLiveUpdates } from '../../src/design/CustomerLiveUpdates';
 export default function UserTabs() {
   const palette = usePalette();
   const { width } = useWindowDimensions();
@@ -14,6 +18,7 @@ export default function UserTabs() {
   );
   return (
     <InterfaceTheme role="customer"><Tabs
+      tabBar={!desktop && !hideTabs ? props => <View><CustomerLiveUpdates /><BottomTabBar {...props} /></View> : undefined}
       screenOptions={{
         headerShown: false,
         tabBarBackground: desktop ? () => <View pointerEvents="none" style={{ position: "absolute", top: 24, left: 20 }}><Brand /><Txt style={{ color: palette.muted, marginTop: 8 }}>Your laundry, simplified</Txt></View> : undefined,
@@ -31,6 +36,7 @@ export default function UserTabs() {
           height: desktop ? undefined : 68 + insets.bottom,
           paddingTop: desktop ? 116 : 8, paddingBottom: desktop ? 16 : Math.max(insets.bottom, 8),
         },
+        ...(desktop ? { ...workspaceSidebar(palette, insets.bottom, 'Your laundry, simplified'), ...(hideTabs ? { tabBarStyle: { display: 'none' as const } } : {}) } : {}),
       }}
     >
       <Tabs.Screen
@@ -38,7 +44,7 @@ export default function UserTabs() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }) => (
-            <Asset name="home.png" tint={color} size={26} />
+            desktop ? <House size={24} color={color} /> : <Asset name="home.png" tint={color} size={26} />
           ),
         }}
       />
@@ -47,7 +53,7 @@ export default function UserTabs() {
         options={{
           title: "Orders",
           tabBarIcon: ({ color }) => (
-            <Asset name="activities.png" tint={color} size={26} />
+            desktop ? <ClipboardList size={24} color={color} /> : <Asset name="activities.png" tint={color} size={26} />
           ),
         }}
       />
@@ -56,7 +62,7 @@ export default function UserTabs() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color }) => (
-            <Asset name="profile.png" tint={color} size={26} />
+            desktop ? <UserRound size={24} color={color} /> : <Asset name="profile.png" tint={color} size={26} />
           ),
         }}
       />

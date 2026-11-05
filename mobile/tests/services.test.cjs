@@ -34,6 +34,7 @@ function harness({ confirmed = true, failure, services } = {}) {
     ...colorsModule.exports,
     serviceCardColors: colorsModule.exports.serviceCardColors,
     useSafeAreaInsets: () => ({ top: 0, bottom: 0 }), Platform: { OS: 'web' },
+    useWindowDimensions: () => ({ width: 390, height: 844 }),
     useState(initial) {
       const slot = index++;
       if (!(slot in hooks)) hooks[slot] = initial;
@@ -54,14 +55,14 @@ function harness({ confirmed = true, failure, services } = {}) {
     palette: { navy: 'navy', danger: 'red' }, styles: { stack: {}, row: {}, grow: {} },
   };
   for (const name of ['Screen', 'Button', 'View', 'FormError', 'Field', 'Txt', 'Card', 'Pressable',
-    'Plus', 'Pencil', 'Trash2', 'Check', 'X', 'WeightRangeSlider', 'KeyboardAvoidingView', 'QueryState', 'Section', 'Empty', 'MenuRow', 'Modal', 'ScrollView', 'Choice']) context[name] = name;
+    'Plus', 'Pencil', 'Trash2', 'Check', 'X', 'WeightRangeSlider', 'ServiceTimerSlider', 'KeyboardAvoidingView', 'QueryState', 'Section', 'Empty', 'MenuRow', 'Modal', 'ScrollView', 'Choice']) context[name] = name;
   context.usePalette = () => context.palette;
   vm.runInNewContext(compiled, context);
   const render = () => { index = 0; return context.exports.ServicesDesign(); };
   const dialog = () => elements(render(), 'Modal')[0];
   const button = (title, position = 0) => [...elements(render(), 'Button').filter(item => item.props.title === title),
     ...elements(render(), 'Pressable').filter(item => item.props.accessibilityLabel === title)][position];
-  const field = label => elements(dialog(), 'Field').find(item => item.props.label === label);
+  const field = label => [...elements(dialog(), 'Field'), ...elements(dialog(), 'ServiceTimerSlider')].find(item => item.props.label === label);
   return { render, dialog, button, field, calls, invalidations, confirmations };
 }
 
@@ -74,8 +75,8 @@ test('add and edit modals show kg units and editing saves service weight and pri
   assert.equal(app.dialog().props.visible, true);
   assert.equal(app.field('Weight per load').props.value, '8');
   assert.equal(app.field('Weight per load').props.suffix, 'kg');
-  assert.equal(app.field('Standard washing time').props.value, '30');
-  assert.equal(app.field('Standard drying time').props.value, '45');
+  assert.equal(app.field('Washing time (optional)').props.value, '30');
+  assert.equal(app.field('Drying time (optional)').props.value, '45');
   app.field('Weight per load').props.onChangeText('10');
   app.field('Price per load').props.onChangeText('250');
   await app.button('Save Changes').props.onPress();
@@ -153,19 +154,20 @@ test('price range fields reject text, signs, scientific notation and multiple de
   }
 });
 
-test('standard washing and drying times accept whole minutes only', () => {
+test('new timer sliders default to 45/60 and optional timers can be cleared while editing', async () => {
   const app = harness();
+  app.render().props.right.props.onPress();
+  assert.equal(app.field('Washing time (optional)').props.value, '45');
+  assert.equal(app.field('Drying time (optional)').props.value, '60');
+  assert.equal(app.field('Washing time (optional)').props.maximum, 210);
+  assert.equal(app.field('Drying time (optional)').props.maximum, 240);
+  app.button('Cancel').props.onPress();
   app.button('Edit').props.onPress();
-  for (const label of ['Standard washing time', 'Standard drying time']) {
-    const field = app.field(label);
-    const original = field.props.value;
-    for (const input of ['letters', '-5', '1.5', '1e3']) {
-      field.props.onChangeText(input);
-      assert.equal(app.field(label).props.value, original);
-    }
-    field.props.onChangeText('60');
-    assert.equal(app.field(label).props.value, '60');
-  }
+  app.field('Washing time (optional)').props.onChange('');
+  app.field('Drying time (optional)').props.onChange('');
+  await app.button('Save Changes').props.onPress();
+  assert.equal(app.calls[0].body.washingMinutes, null);
+  assert.equal(app.calls[0].body.dryingMinutes, null);
 });
 
 test('new price ranges start at 1–12 kg and submit the slider selection', async () => {
